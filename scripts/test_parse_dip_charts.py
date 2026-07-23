@@ -128,3 +128,25 @@ class TestParseDataRows:
         points = parse_data_rows(lines, page_num=325, warnings=warnings)
         assert points == []
         assert len(warnings) == 1
+
+
+from parse_dip_charts import validate_tanks
+
+
+class TestValidateTanks:
+    def test_accepts_tank_within_capacity_tolerance(self):
+        tanks = {"015": TankRecord("015", "ZCL", 50000.0, [(2, 99), (246, 50007)], [13])}
+        good, flagged = validate_tanks(tanks, [])
+        assert "015" in good
+        assert flagged == {}
+
+    def test_flags_tank_whose_max_volume_is_far_from_capacity(self):
+        tanks = {"999": TankRecord("999", "MYSTERY", 10000.0, [(2, 50), (100, 5000)], [1])}
+        good, flagged = validate_tanks(tanks, [])
+        assert "999" not in good
+        assert "999" in flagged
+
+    def test_flags_tank_with_no_points(self):
+        tanks = {"888": TankRecord("888", "EMPTY", 10000.0, [], [1])}
+        good, flagged = validate_tanks(tanks, [])
+        assert "888" in flagged

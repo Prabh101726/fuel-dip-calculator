@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pdfplumber
+
 NUMERIC_TOKEN_RE = re.compile(r"^[\d,]+(\.\d+)?$")
 HEADER_RE = re.compile(r"TANK TYPE #(\S+?)(?:\s+(\d+)\s+OF\s+(\d+))?(?:\s|$)")
 CAPACITY_RE = re.compile(r"CAPACITY\s+([\d,]+(?:\.\d+)?)")
@@ -116,3 +118,112 @@ def parse_data_rows(data_lines: list[list[dict]], page_num: int, warnings: list[
                 continue
             points.append((dip, vol))
     return points
+
+
+def parse_pdf(pdf_path: str, warnings: list[str]) -> dict[str, TankRecord]:
+    tanks: dict[str, TankRecord] = {}
+    last_chart_number: str | None = None
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_num, page in enumerate(pdf.pages, start=1):
+            words = page.extract_words()
+            if not words:
+                continue
+            lines = group_words_into_lines(words)
+            header_lines, data_lines = split_header_and_data(lines)
+            header = parse_header(header_lines)
+            if header is None:
+                raw = " ".join(w["text"] for line in header_lines[:2] for w in line)
+                warnings.append(f"page {page_num}: no 'TANK TYPE #...' header found, skipping. First words: {raw!r}")
+                continue
+
+            anomaly = detect_anomalous_layout(header, data_lines)
+            if anomaly:
+                warnings.append(f"page {page_num}: skipping tank #{header['chart_number']}: {anomaly}")
+                continue
+
+            if header["capacity_liters"] is None:
+                warnings.append(f"page {page_num}: tank #{header['chart_number']} has no parseable CAPACITY, skipping")
+                continue
+
+            points = parse_data_rows(data_lines, page_num, warnings)
+            chart_number = header["chart_number"]
+
+            if chart_number in tanks:
+                if header["part_num"] != 1 and chart_number != last_chart_number:
+                    warnings.append(
+                        f"page {page_num}: continuation page for #{chart_number} part {header['part_num']} "
+                        f"doesn't immediately follow that tank's previous page, appending anyway"
+                    )
+                elif header["part_num"] == 1:
+                    warnings.append(f"page {page_num}: duplicate chart_number #{chart_number}, merging into existing tank")
+                tanks[chart_number].points.extend(points)
+                tanks[chart_number].pages.append(page_num)
+            else:
+                tanks[chart_number] = TankRecord(
+                    chart_number=chart_number,
+                    manufacturer=header["manufacturer"],
+                    capacity_liters=header["capacity_liters"],
+                    points=points,
+                    pages=[page_num],
+                )
+
+            last_chart_number = chart_number
+    return tanks
+
+
+def validate_tanks(tanks: dict[str, TankRecord], warnings: list[str]) -> tuple[dict[str, TankRecord], dict[str, str]]:
+    good: dict[str, TankRecord] = {}
+    flagged: dict[str, str] = {}
+    for chart_number, tank in tanks.items():
+        if not tank.points:
+            flagged[chart_number] = "no dip/volume points parsed"
+            continue
+        if tank.capacity_liters <= 0:
+            flagged[chart_number] = f"non-positive capacity {tank.capacity_liters}"
+            continue
+        max_volume = max(v for _, v in tank.points)
+        relative_diff = abs(max_volume - tank.capacity_liters) / tank.capacity_liters
+        if relative_diff > CAPACITY_TOLERANCE:
+            flagged[chart_number] = (
+                f"max charted volume {max_volume} is {relative_diff:.1%} off stated capacity {tank.capacity_liters}"
+            )
+            continue
+        good[chart_number] = tank
+    return good, flagged
+
+
+def write_outputs(good: dict[str, TankRecord], flagged: dict[str, str], warnings: list[str], out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    good_json = {
+        chart_number: {
+            "manufacturer": tank.manufacturer,
+            "capacity_liters": tank.capacity_liters,
+            "points": tank.points,
+            "pages": tank.pages,
+        }
+        for chart_number, tank in good.items()
+    }
+    (out_dir / "dip_charts.json").write_text(json.dumps(good_json, indent=2))
+    (out_dir / "review_needed.json").write_text(json.dumps(flagged, indent=2))
+    (out_dir / "parse_warnings.log").write_text("\n".join(warnings))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("pdf_path")
+    parser.add_argument("out_dir")
+    args = parser.parse_args()
+
+    warnings: list[str] = []
+    tanks = parse_pdf(args.pdf_path, warnings)
+    good, flagged = validate_tanks(tanks, warnings)
+    write_outputs(good, flagged, warnings, Path(args.out_dir))
+
+    print(f"Parsed {len(tanks)} tanks: {len(good)} good, {len(flagged)} flagged for review.")
+    print(f"{len(warnings)} row/page-level warnings logged.")
+    print(f"Output written to {args.out_dir}/")
+
+
+if __name__ == "__main__":
+    main()
