@@ -48,3 +48,9 @@ what's explicitly out of scope for v1.
   `~/Desktop`/`~/Documents` (iCloud), same convention as `detours-mobile` and
   `detours-website`.
 - GitHub: `Prabh101726/fuel-dip-calculator` (public).
+- Supabase project: `fuel-dip-calculator` (ref `oxxmcdtafnvnkbojnrgx`), org
+  **SiteSync** (`mmlgaplkkzoteackwuez`) — same org as Detours's Project and
+  Portfolio, but its own separate project/database. Region: Canada (Central).
+  Credentials live in `.env.local` (gitignored, never committed) — URL, anon key,
+  service role key, DB password. Not yet `supabase link`-ed / no migrations folder
+  yet; do that as part of scaffolding.
