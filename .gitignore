@@ -20,3 +20,4 @@ __pycache__/
 
 # Generated parser output (regenerate from real PDF; not committed)
 scripts/output/
+.vercel
