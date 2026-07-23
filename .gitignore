@@ -17,3 +17,6 @@ next-env.d.ts
 .venv/
 __pycache__/
 *.pyc
+
+# Generated parser output (regenerate from real PDF; not committed)
+scripts/output/
