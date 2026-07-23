@@ -9,10 +9,36 @@ dip and get delivered volume + reconciliation.
 **Stack:** Next.js (TypeScript, App Router) · Supabase (Postgres, Auth, RLS) ·
 Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 
-**Status:** design phase complete, implementation not yet started. Read
+**Status:** Foundation phase complete and merged to `main` (Jul 23 2026) — Next.js
+scaffold, CI, the calculation library, the Supabase schema (pushed to the live
+project), and the PDF→seed-data pipeline are all built and tested. Driver-facing
+UI, Supabase Auth wiring, and actually running the seed against the live database
+are NOT started — that's the next phase. Read
 `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md` before writing
 any code — it is the source of truth for the data model, driver workflow, and
-what's explicitly out of scope for v1.
+what's explicitly out of scope for v1. The implementation plan for the completed
+foundation phase is at
+`docs/superpowers/plans/2026-07-23-foundation-scaffold-schema-parser.md`.
+
+## What's built (foundation phase)
+
+- `lib/dip-calculator/` — `interpolateVolume()` (linear interpolation over a
+  tank's dip chart, throws `DipOutOfRangeError` rather than extrapolating) and
+  the two-phase `calculateBeforeDelivery()`/`calculateAfterDelivery()` chain
+  (the #1-#7 fields). Fully unit-tested, including regression fixtures using
+  real dip/volume readings transcribed from tanks #015, #014, #526 in the
+  source PDF — see `interpolate.regression.test.ts`.
+- `supabase/migrations/20260723120000_initial_schema.sql` — all 5 tables, the
+  `my_company_id()` RLS helper, and policies. Already linked and pushed to the
+  live `fuel-dip-calculator` Supabase project.
+- `scripts/parse_dip_charts.py` + `scripts/generate_seed_sql.py` — the one-time
+  PDF ETL described below. Already run against the real PDF: 305 tanks parsed,
+  293 good, 12 flagged for manual review (capacity-tolerance mismatches — see
+  `supabase/seed/review_needed.json`). `supabase/seed/dip_charts_seed.sql`
+  (transaction-wrapped) is generated and committed but **has not been run
+  against the live database** — that's a deliberate, separately-confirmed step,
+  not automatic.
+- CI (`.github/workflows/ci.yml`): lint, typecheck, test, build on every push.
 
 ## Load-bearing constraints
 
@@ -52,5 +78,6 @@ what's explicitly out of scope for v1.
   **SiteSync** (`mmlgaplkkzoteackwuez`) — same org as Detours's Project and
   Portfolio, but its own separate project/database. Region: Canada (Central).
   Credentials live in `.env.local` (gitignored, never committed) — URL, anon key,
-  service role key, DB password. Not yet `supabase link`-ed / no migrations folder
-  yet; do that as part of scaffolding.
+  service role key, DB password. CLI is linked; the initial schema migration is
+  pushed and live. The dip-chart catalog seed (`supabase/seed/dip_charts_seed.sql`)
+  is generated but has NOT been run against it yet.
