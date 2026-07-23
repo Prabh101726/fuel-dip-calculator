@@ -9,16 +9,37 @@ dip and get delivered volume + reconciliation.
 **Stack:** Next.js (TypeScript, App Router) · Supabase (Postgres, Auth, RLS) ·
 Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 
-**Status:** Foundation phase complete and merged to `main` (Jul 23 2026) — Next.js
-scaffold, CI, the calculation library, the Supabase schema (pushed to the live
-project), and the PDF→seed-data pipeline are all built and tested. Driver-facing
-UI, Supabase Auth wiring, and actually running the seed against the live database
-are NOT started — that's the next phase. Read
-`docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md` before writing
-any code — it is the source of truth for the data model, driver workflow, and
-what's explicitly out of scope for v1. The implementation plan for the completed
-foundation phase is at
+**Status:** Foundation phase (Jul 23 2026) + first driver-facing phase (Jul 23
+2026, same day) both merged to `main` and **live in production**:
+https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
+Magic-link login (email only, no passwords), a 14-day trial with
+auto-provisioned company/driver on first login, a single-tank calculator
+screen, and a flat history list are all built and deployed. Read
+`docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md` for the
+original v1 data model/workflow spec — **note the auth model has since
+diverged from it**: the spec assumed simple email/password with no
+self-signup, but the shipped version uses magic-link + auto-provisioning +
+trial gating instead (a deliberate, user-approved change — see
+`docs/next-task-cursor.md` and project memory for why). The foundation
+implementation plan is at
 `docs/superpowers/plans/2026-07-23-foundation-scaffold-schema-parser.md`.
+
+**Still open / manual steps pending:**
+- Vercel **Preview** environment env vars (`NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`) are NOT set — only Production is. A CLI bug
+  in agent/non-interactive mode blocked adding them for "all preview
+  branches"; add via Vercel dashboard → Settings → Environment Variables, or
+  retry with an updated `vercel` CLI (`npm i -g vercel@latest`, needs sudo
+  here).
+- Supabase Auth redirect allow-list needs
+  `https://fuel-dip-calculator.vercel.app/auth/callback` added by hand
+  (Supabase Dashboard → Authentication → URL Configuration) — deliberately
+  NOT pushed via `supabase config push`, since that would send the whole
+  local `config.toml` (including local-dev `site_url`) to the live project
+  and could clobber auth settings configured directly in the dashboard.
+- Multi-tank session UI, signature capture, paid billing beyond the trial
+  clock, and history filtering are explicitly deferred (see
+  `docs/next-task-cursor.md`'s Out of Scope section).
 
 ## What's built (foundation phase)
 
@@ -39,6 +60,33 @@ foundation phase is at
   confirmed 293 `tank_types` / 38,366 `dip_chart_points` rows live. The 12
   flagged tanks in `review_needed.json` are still excluded pending review.
 - CI (`.github/workflows/ci.yml`): lint, typecheck, test, build on every push.
+
+## What's built (driver-facing phase, Jul 23 2026)
+
+- `lib/supabase/{client,server,middleware}.ts` — browser/server Supabase
+  clients + session-refresh middleware (`@supabase/ssr`).
+- `middleware.ts` — gates `/calculator` and `/history` behind an active
+  session + unexpired trial; redirects to `/login` or `/trial-ended`.
+- `app/login/page.tsx` — email-only magic-link sign-in (`signInWithOtp`).
+- `app/auth/callback/route.ts` — exchanges the magic-link code for a session,
+  calls the `ensure_trial_driver()` RPC (auto-provisions `companies` +
+  `drivers` on first login only, 14-day trial via `companies.trial_ends_at`).
+- `app/calculator/page.tsx` — thin wrapper using `next/dynamic({ ssr: false })`
+  around `CalculatorClient.tsx`, which is the actual single-tank flow: pick
+  tank type, before-dip → `calculateBeforeDelivery`, after-dip →
+  `calculateAfterDelivery`, save via `lib/dip-calculations/toInsertPayload.ts`.
+  **The `ssr: false` split is load-bearing** — the original `useMemo`-created
+  Supabase client broke `next build` because Next.js still server-renders
+  `"use client"` pages once at build time even under `force-dynamic`; don't
+  reintroduce a top-level `createClient()` call in a page component without
+  this pattern (or lazy-create inside handlers only, like `login`/`trial-ended`
+  already do).
+- `app/history/page.tsx` — Server Component, flat list of the driver's own
+  `dip_calculations` (RLS-scoped).
+- `app/trial-ended/page.tsx` — shown when `trial_ends_at` has passed.
+- `supabase/migrations/20260723161041_trial_and_ensure_driver.sql` — adds
+  `companies.trial_ends_at` and the `ensure_trial_driver()` SECURITY DEFINER
+  RPC.
 
 ## Load-bearing constraints
 
