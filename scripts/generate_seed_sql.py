@@ -1,0 +1,53 @@
+"""Generate a Supabase seed SQL file from the parsed dip-chart JSON produced
+by parse_dip_charts.py.
+
+Run: python3 scripts/generate_seed_sql.py scripts/output/dip_charts.json supabase/seed/dip_charts_seed.sql
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+
+def escape_sql_literal(value: str) -> str:
+    return value.replace("'", "''")
+
+
+def tank_to_sql(chart_number: str, tank: dict) -> str:
+    manufacturer = escape_sql_literal(tank["manufacturer"])
+    capacity = tank["capacity_liters"]
+    values = ",".join(f"({dip},{vol})" for dip, vol in tank["points"])
+    return (
+        "WITH ins AS (\n"
+        "  INSERT INTO tank_types (chart_number, manufacturer, capacity_liters)\n"
+        f"  VALUES ('{escape_sql_literal(chart_number)}', '{manufacturer}', {capacity})\n"
+        "  RETURNING id\n"
+        ")\n"
+        "INSERT INTO dip_chart_points (tank_type_id, dip_cm, volume_liters)\n"
+        f"SELECT id, v.dip_cm, v.volume_liters FROM ins, (VALUES {values}) AS v(dip_cm, volume_liters);"
+    )
+
+
+def generate_seed_sql(tanks_by_chart_number: dict[str, dict]) -> str:
+    statements = [
+        tank_to_sql(chart_number, tank)
+        for chart_number, tank in sorted(tanks_by_chart_number.items())
+    ]
+    return "\n\n".join(statements) + "\n"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input_json")
+    parser.add_argument("output_sql")
+    args = parser.parse_args()
+
+    tanks = json.loads(Path(args.input_json).read_text())
+    sql = generate_seed_sql(tanks)
+    Path(args.output_sql).write_text(sql)
+    print(f"Wrote {len(tanks)} tank INSERT statements to {args.output_sql}")
+
+
+if __name__ == "__main__":
+    main()
