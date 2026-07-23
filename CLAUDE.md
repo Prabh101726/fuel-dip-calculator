@@ -35,9 +35,9 @@ foundation phase is at
   PDF ETL described below. Already run against the real PDF: 305 tanks parsed,
   293 good, 12 flagged for manual review (capacity-tolerance mismatches — see
   `supabase/seed/review_needed.json`). `supabase/seed/dip_charts_seed.sql`
-  (transaction-wrapped) is generated and committed but **has not been run
-  against the live database** — that's a deliberate, separately-confirmed step,
-  not automatic.
+  (transaction-wrapped) has been run against the live database (Jul 23 2026) —
+  confirmed 293 `tank_types` / 38,366 `dip_chart_points` rows live. The 12
+  flagged tanks in `review_needed.json` are still excluded pending review.
 - CI (`.github/workflows/ci.yml`): lint, typecheck, test, build on every push.
 
 ## Load-bearing constraints
@@ -79,5 +79,8 @@ foundation phase is at
   Portfolio, but its own separate project/database. Region: Canada (Central).
   Credentials live in `.env.local` (gitignored, never committed) — URL, anon key,
   service role key, DB password. CLI is linked; the initial schema migration is
-  pushed and live. The dip-chart catalog seed (`supabase/seed/dip_charts_seed.sql`)
-  is generated but has NOT been run against it yet.
+  pushed and live, and the full dip-chart catalog seed
+  (`supabase/seed/dip_charts_seed.sql`) has been run (293 tank_types, 38,366
+  dip_chart_points). Note: `supabase link` state lives in the untracked
+  `supabase/.temp/` — it's per-checkout, so re-run `supabase link` if working
+  from a fresh clone or a different worktree.

@@ -21,7 +21,7 @@ There is no self-signup flow and no INSERT policy on `companies`/`drivers` for r
 
 ## Also know
 
-`supabase/seed/dip_charts_seed.sql` (293 real tanks) has been generated but **not yet run** against the live database — `tank_types`/`dip_chart_points` are currently empty. You'll need at least one tank seeded to test against (either run that seed file, or insert one test tank type + a handful of dip/volume points by hand for local dev — ask the user before running the full seed against the live project, since it's ~300 records).
+`supabase/seed/dip_charts_seed.sql` has been run against the live database (Jul 23 2026) — `tank_types` has 293 rows, `dip_chart_points` has 38,366 rows. You can query the real catalog directly; no local test-data setup needed. 12 tanks were flagged during parsing and deliberately excluded (see `supabase/seed/review_needed.json`) — don't expect those chart_numbers to be present.
 
 ## Task: build the login screen + the single-tank driver calculator flow (steps 1-5 of the Driver Workflow section in the design spec)
 
