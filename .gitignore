@@ -7,3 +7,11 @@ node_modules/
 *.log
 .worktrees/
 .superpowers/
+
+# Next.js
+/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python ETL venv
+.venv/
