@@ -1,42 +1,99 @@
-# Next Task for Cursor — Login + Single-Tank Driver Calculator Flow
+# Next Task for Cursor — Multi-Tank Session (4 Tabs) + Clear Button
 
-Context for Cursor — fuel-dip-calculator, next phase after Foundation.
+Context for Cursor — fuel-dip-calculator, fast-follow after the login/trial/
+single-tank calculator phase (already live in production).
 
-Repo: `~/dev/fuel-dip-calculator` (also `https://github.com/Prabh101726/fuel-dip-calculator`), `main` branch, CI green.
+Repo: `~/dev/fuel-dip-calculator` (`https://github.com/Prabh101726/fuel-dip-calculator`), `main` branch, CI green.
+
+## Why
+
+Real-world gas stations typically have 3-4 underground tanks. Right now
+`/calculator` only handles one tank at a time — a driver arriving at a station
+with 4 tanks has to finish one tank's entire before/after flow, save, then
+start over from a blank screen for the next tank. They want to record all the
+**opening (before-delivery) dips together** across every tank at the station,
+then come back and do the after-delivery dips per tank whenever it's
+convenient — not forced into one tank at a time. There's also no way to reset
+a single calculation and redo it without a full page reload.
+
+This was explicitly deferred in the original task brief ("v1 — don't build
+multi-simultaneous-calculator management yet, that's a fast-follow") — this is
+that fast-follow.
 
 ## What's already built (don't rebuild, reuse)
 
-- `lib/dip-calculator/interpolate.ts` — `interpolateVolume(points: DipChartPoint[], dipCm: number): number`, throws `DipOutOfRangeError` if `dipCm` is outside the chart's range. Do not extrapolate around this — always let it throw and show the error.
-- `lib/dip-calculator/calculate.ts`:
-  - `calculateBeforeDelivery({ tankPoints, capacityLiters, safeFillPct, beforeDipCm, plannedDeliveryLiters }) → { safeFillLiters, beforeVolumeLiters, tankWillHoldLiters, overfillWarning }`
-  - `calculateAfterDelivery({ tankPoints, safeFillLiters, beforeDipCm, beforeVolumeLiters, plannedDeliveryLiters, afterDipCm }) → { afterVolumeLiters, receiptVolumeLiters, volumeDifferenceLiters, reversedDipWarning, overfillWarning }`
-  - These are the safety-critical #1-#7 calculation chain from the paper form. Never reimplement this math in a component — always call these functions.
-- `lib/dip-calculator/types.ts` — `DipChartPoint { dipCm, volumeLiters }`.
-- Supabase schema is live (project ref `oxxmcdtafnvnkbojnrgx`, credentials in `.env.local`): `companies`, `drivers` (id references `auth.users`, has `company_id`, `role`), `tank_types` (chart_number, manufacturer, capacity_liters — shared catalog, read-only to authenticated users via RLS), `dip_chart_points` (tank_type_id, dip_cm, volume_liters), `dip_calculations` (the full #1-#7 row — see `supabase/migrations/20260723120000_initial_schema.sql` for exact columns).
-- Full design spec (driver workflow, error handling rules, what's out of scope): `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`.
+Read `app/calculator/CalculatorClient.tsx` in full before starting — it's the
+single component being refactored. Everything in it today (tank picker,
+safe-fill %, before/after dip fields + results, warnings, retain/signature
+fields, save-to-`dip_calculations`) stays exactly as-is *logically* — this task
+is about running **4 independent copies of that flow side by side as tabs**,
+not changing the calculation logic.
 
-## Real gap to know about before you design the login screen
+- `lib/dip-calculator/calculate.ts` — `calculateBeforeDelivery` /
+  `calculateAfterDelivery`. Do not touch.
+- `lib/dip-calculations/toInsertPayload.ts` — maps one tank's calc result to
+  one `dip_calculations` insert row. Do not touch — each tab still inserts its
+  own independent row; there's no session/grouping concept in the schema and
+  none is needed for this task.
+- `dip_calculations` already stores `tank_type_id` per row — no migration
+  needed. Do not add a "session" table for this.
 
-There is no self-signup flow and no INSERT policy on `companies`/`drivers` for regular users — a `companies` row and a matching `drivers` row (with `id` = the corresponding `auth.users.id`) currently have to be created by hand (Supabase dashboard or service-role script) before a driver can log in. Don't build a signup UI yet — just a login screen (email/password via Supabase Auth) against a pre-provisioned account, and surface a clear error if login succeeds but no matching `drivers` row exists.
+## Task: split `CalculatorClient` into a shared shell + 4 tab slots
 
-## Also know
+1. **Extract the per-tank form** (tank picker through save button — everything
+   currently in `CalculatorClient` below the `<header>`) into a new component,
+   e.g. `app/calculator/TankSlot.tsx`. It owns all the state that's currently
+   local to `CalculatorClient` per tank: `selectedTank`, `tankPoints`,
+   `pointsLoading`/`pointsError`, `safeFillPct`, `locationLabel`,
+   `productGrade`, `compartmentNo`, `beforeDipCm`, `plannedDeliveryLiters`,
+   `afterDipCm`, `divertedTo`, `newBolNo`, `litersRetained`,
+   `driverSignature`, `saveError`, `saving`. Props in: `tanks` list,
+   `driverId`, `companyId`, `supabase` client (all lifted to the parent so
+   they're fetched/created once, not once per tab).
 
-`supabase/seed/dip_charts_seed.sql` has been run against the live database (Jul 23 2026) — `tank_types` has 293 rows, `dip_chart_points` has 38,366 rows. You can query the real catalog directly; no local test-data setup needed. 12 tanks were flagged during parsing and deliberately excluded (see `supabase/seed/review_needed.json`) — don't expect those chart_numbers to be present.
+2. **`CalculatorClient` becomes the shell:**
+   - Keeps the existing auth check, driver/company lookup, and the one-time
+     `tank_types` fetch (used by all 4 tabs — don't refetch per tab).
+   - Renders 4 always-visible tabs, labeled "Tank 1"–"Tank 4" — once a tab has
+     a tank selected, prefer showing that tank's chart number instead (e.g.
+     "#526") so the driver can tell tabs apart at a glance. Active tab is
+     visually distinct (reuse the existing `--accent` styling pattern already
+     used for the safe-fill % toggle).
+   - Renders all 4 `<TankSlot>` instances simultaneously but only the active
+     tab's is visible (e.g. `hidden` class / `display: none` on the inactive
+     ones) — **do not conditionally unmount inactive tabs**. State must
+     persist when switching tabs, since the whole point is entering all 4
+     opening dips before circling back for afters.
+   - Keep the `history` link / logout button in the header as-is.
 
-## Task: build the login screen + the single-tank driver calculator flow (steps 1-5 of the Driver Workflow section in the design spec)
+3. **Add a "Clear" button** in each `TankSlot`, next to the "Save calculation"
+   button. Resets that slot's state back to its initial blank values (same
+   defaults as a freshly mounted slot: no tank selected, empty fields,
+   `safeFillPct` back to `0.9`). Only clears that one tab — the other 3 are
+   untouched.
 
-1. Add `@supabase/supabase-js` + `@supabase/ssr`, set up a browser client and a server client following current Supabase Next.js App Router conventions (`createBrowserClient`/`createServerClient`, cookie handling for the App Router).
-2. Login screen: email/password against Supabase Auth. On success, look up the `drivers` row for the logged-in user; if none exists, show a clear "no driver account found" error rather than a raw Supabase error.
-3. One driver-facing screen for a single tank calculator (v1 — don't build multi-simultaneous-calculator management yet, that's a fast-follow):
-   - Tank type picker: search `tank_types` by chart_number/manufacturer/capacity (it's a small shared read-only table, RLS already allows `select` for authenticated users).
-   - Safe-fill % choice (90% or 95%), optional location label / product grade / compartment #.
-   - Before-delivery dip input → call `calculateBeforeDelivery`, show `safeFillLiters` (#1), `beforeVolumeLiters` (#2), `tankWillHoldLiters` (#3) immediately.
-   - Planned delivery amount input (#4) → show the `overfillWarning` from `calculateBeforeDelivery` as a **prominent, non-dismissible** warning if true (per spec — this is a real spill-risk warning, not a toast that auto-hides).
-   - After-delivery dip input → call `calculateAfterDelivery`, show #5-#7, plus `reversedDipWarning` and its own `overfillWarning` equally prominently if true.
-   - Diverted-to / new BOL # / liters-retained fields, typed-name signature field (no signature image capture in v1, per spec).
-   - Save → insert one row into `dip_calculations` with `driver_id`/`company_id` from the session, mapping every field 1:1 to the migration's column names.
-4. A minimal flat history list (own calculations only, RLS already enforces this) — no filtering/dashboards yet, per spec's out-of-scope list.
+4. **Change post-save behavior.** Today, saving redirects to `/history`
+   (`router.push("/history")`). Change this: on successful save, clear the
+   slot back to blank (same reset as the Clear button) and show a small inline
+   "Saved ✓" confirmation instead of navigating away — the driver likely has
+   more tanks to do in the same visit. Do **not** remove the `/history` link
+   from the header; that's still how they check past saves when they want to.
+
+## Out of scope (don't build)
+
+- No new Supabase tables/columns, no "session" or "visit" grouping concept.
+- No cross-tab validation (e.g. warning if the same tank is picked in two
+  tabs) — out of scope for this pass.
+- No persisting tab state across a page reload/navigation — in-memory only,
+  same as today's single-tank flow.
+- Don't touch `/history` or the login/trial flow.
 
 ## Testing
 
-Keep `lib/dip-calculator/` untouched and don't duplicate its logic in components. If you add new pure logic (e.g. a mapper from calc results to a `dip_calculations` insert payload), add Vitest tests for it next to the file, following the existing test file conventions in `lib/dip-calculator/*.test.ts`. Run `npm run lint && npm run typecheck && npm run test && npm run build` before considering it done — that's what CI checks.
+Keep `lib/dip-calculator/` and `lib/dip-calculations/` untouched. Run
+`npm run lint && npm run typecheck && npm run test && npm run build` before
+considering it done — that's what CI checks. If you add any new pure
+logic (e.g. a shared "blank slot state" factory), it doesn't need new tests
+unless it does real computation — pure UI-state resets don't need Vitest
+coverage, but do a manual click-through of all 4 tabs + Clear + Save to
+confirm state isolation before calling it done.
