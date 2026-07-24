@@ -9,19 +9,21 @@ dip and get delivered volume + reconciliation.
 **Stack:** Next.js (TypeScript, App Router) · Supabase (Postgres, Auth, RLS) ·
 Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 
-**Status:** Foundation phase (Jul 23 2026) + first driver-facing phase (Jul 23
-2026, same day) both merged to `main` and **live in production**:
+**Status:** Foundation phase, driver-facing phase, and a multi-tank fast-follow
+(all Jul 23-24 2026) merged to `main` and **live in production**:
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
-Magic-link login (email only, no passwords), a 14-day trial with
-auto-provisioned company/driver on first login, a single-tank calculator
-screen, and a flat history list are all built and deployed. Read
+Email/password login (see below — replaced magic-link the same day it shipped),
+a 14-day trial with auto-provisioned company/driver on first login/signup, a
+**4-tab multi-tank calculator** screen, and a flat history list are all built
+and deployed. Read
 `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md` for the
 original v1 data model/workflow spec — **note the auth model has since
-diverged from it**: the spec assumed simple email/password with no
-self-signup, but the shipped version uses magic-link + auto-provisioning +
-trial gating instead (a deliberate, user-approved change — see
-`docs/next-task-cursor.md` and project memory for why). The foundation
-implementation plan is at
+diverged from it twice**: the spec assumed simple email/password with no
+self-signup; the first shipped version used magic-link + auto-provisioning +
+trial gating instead (user-approved); Cursor then replaced magic-link with
+password auth the same day (sign-in + create-account forms, still calling
+`ensure_trial_driver()` on first signup) — password auth is what's actually
+live now. The foundation implementation plan is at
 `docs/superpowers/plans/2026-07-23-foundation-scaffold-schema-parser.md`.
 
 **Still open / manual steps pending:**
@@ -37,9 +39,10 @@ implementation plan is at
   NOT pushed via `supabase config push`, since that would send the whole
   local `config.toml` (including local-dev `site_url`) to the live project
   and could clobber auth settings configured directly in the dashboard.
-- Multi-tank session UI, signature capture, paid billing beyond the trial
-  clock, and history filtering are explicitly deferred (see
-  `docs/next-task-cursor.md`'s Out of Scope section).
+- Signature capture (image, not typed name), paid billing beyond the trial
+  clock, and history filtering are still explicitly deferred (see
+  `docs/next-task-cursor.md`'s Out of Scope section — now describing the
+  multi-tank task, superseding the single-tank brief it replaced).
 
 ## What's built (foundation phase)
 
@@ -67,14 +70,15 @@ implementation plan is at
   clients + session-refresh middleware (`@supabase/ssr`).
 - `middleware.ts` — gates `/calculator` and `/history` behind an active
   session + unexpired trial; redirects to `/login` or `/trial-ended`.
-- `app/login/page.tsx` — email-only magic-link sign-in (`signInWithOtp`).
-- `app/auth/callback/route.ts` — exchanges the magic-link code for a session,
-  calls the `ensure_trial_driver()` RPC (auto-provisions `companies` +
-  `drivers` on first login only, 14-day trial via `companies.trial_ends_at`).
+- `app/login/page.tsx` + `LoginForm.tsx` — originally email-only magic-link
+  sign-in; **superseded same day, see "Auth: magic-link → password" below.**
+- `app/auth/callback/route.ts` — exchanges an auth code for a session, calls
+  the `ensure_trial_driver()` RPC (auto-provisions `companies` + `drivers` on
+  first login/signup only, 14-day trial via `companies.trial_ends_at`).
 - `app/calculator/page.tsx` — thin wrapper using `next/dynamic({ ssr: false })`
-  around `CalculatorClient.tsx`, which is the actual single-tank flow: pick
-  tank type, before-dip → `calculateBeforeDelivery`, after-dip →
-  `calculateAfterDelivery`, save via `lib/dip-calculations/toInsertPayload.ts`.
+  around `CalculatorClient.tsx`. Originally the single-tank flow directly;
+  **superseded same week, see "Multi-tank calculator" below** — the `ssr: false`
+  split itself is still load-bearing and still applies to the refactored shell.
   **The `ssr: false` split is load-bearing** — the original `useMemo`-created
   Supabase client broke `next build` because Next.js still server-renders
   `"use client"` pages once at build time even under `force-dynamic`; don't
@@ -87,6 +91,55 @@ implementation plan is at
 - `supabase/migrations/20260723161041_trial_and_ensure_driver.sql` — adds
   `companies.trial_ends_at` and the `ensure_trial_driver()` SECURITY DEFINER
   RPC.
+
+## Auth: magic-link → password (Jul 23 2026, same day as driver-facing phase)
+
+Cursor replaced the magic-link flow with email/password the same day it
+shipped (commit `f161153`) — `LoginForm.tsx` now has sign-in and create-account
+modes, both calling `supabase.auth.signInWithPassword` /
+`supabase.auth.signUp`. `afterAuth()` still calls `ensure_trial_driver()` and
+`my_trial_ends_at()` after either mode, so trial auto-provisioning is
+unchanged — only the credential mechanism changed. A stale `otp_expired` /
+`access_denied` URL error is caught and shown as "that email link expired,
+sign in with email and password instead" (leftover magic-link links a driver
+might still have). The Supabase Auth redirect allow-list step in "Still open"
+above is no longer needed for this flow specifically, but leave it — other
+auth code paths (`/auth/callback`) still exist and email confirmation may use
+it depending on dashboard settings.
+
+## Multi-tank calculator (Jul 24 2026)
+
+Real gas stations typically have 3-4 tanks; drivers wanted to enter all
+opening (before-delivery) dips together, then come back per tank for the
+after-delivery dip — not forced through one tank start-to-finish before
+starting the next. Shipped as a fast-follow (commit `293de00`) to the
+single-tank v1 that had explicitly deferred this:
+
+- `CalculatorClient.tsx` is now a thin shell: auth/driver/company lookup, one
+  shared `tank_types` fetch (not refetched per tab), a 4-button tab bar
+  (`SLOT_COUNT = 4`, always visible, labeled `Tank 1`-`Tank 4` until a tank is
+  picked, then the tank's chart number e.g. `#526`), and mounts all 4
+  `<TankSlot>` instances simultaneously — inactive ones are hidden via CSS
+  (`hidden`/`aria-hidden`), **never unmounted**, so each tab's state (selected
+  tank, dip inputs, results) survives switching tabs. This is the load-bearing
+  bit — don't refactor tab-switching to conditionally mount/unmount, it would
+  silently wipe a driver's in-progress entry on another tab.
+- `app/calculator/TankSlot.tsx` — the actual single-tank form (tank picker,
+  safe-fill %, before/after dip fields + results, warnings, retain/signature
+  fields, save), extracted verbatim from the old `CalculatorClient` — the
+  calculation logic itself (`calculateBeforeDelivery`/`calculateAfterDelivery`)
+  was **not** touched. Still inserts one independent row per tank into
+  `dip_calculations` — no "session"/"visit" grouping concept exists or is
+  needed, since the schema already keys per-calculation on `tank_type_id`.
+  Reports its selected chart number up to the shell via
+  `onSelectedChartChange` for the tab label.
+- **Clear button** next to Save resets only that slot's own state
+  (`resetSlot()`) back to blank defaults — doesn't touch the other 3 tabs.
+- **Save no longer redirects to `/history`.** On successful save, the slot
+  calls `resetSlot()` and shows a 2.5s "Saved ✓" flash (`savedFlash` state)
+  instead, so the driver stays on the calculator to do the next tank. The
+  `History` link in the header is unchanged for whenever they want to review
+  past saves.
 
 ## Load-bearing constraints
 
