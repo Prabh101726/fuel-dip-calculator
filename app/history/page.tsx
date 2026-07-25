@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { formatLiters, formatSignedLiters } from "@/lib/format-liters";
 import { createClient } from "@/lib/supabase/server";
 
 type TankEmbed = { chart_number: string; manufacturer: string };
@@ -17,11 +18,6 @@ function tankLabelFromEmbed(embed: HistoryRow["tank_types"]): string {
   const tank = Array.isArray(embed) ? embed[0] : embed;
   if (!tank) return "Tank";
   return `#${tank.chart_number} · ${tank.manufacturer}`;
-}
-
-function formatLiters(n: number | null): string {
-  if (n == null || Number.isNaN(Number(n))) return "—";
-  return `${Math.round(Number(n)).toLocaleString("en-CA")} L`;
 }
 
 export default async function HistoryPage() {
@@ -99,7 +95,7 @@ export default async function HistoryPage() {
               <div className="mt-1 flex justify-between gap-3 text-sm">
                 <span className="text-[var(--muted)]">Difference</span>
                 <span className="font-mono font-bold tabular-nums text-[var(--text)]">
-                  {formatLiters(row.volume_difference_liters)}
+                  {formatSignedLiters(row.volume_difference_liters)}
                 </span>
               </div>
             </li>

@@ -14,6 +14,7 @@ import {
   toInsertPayload,
   type SafeFillPct,
 } from "@/lib/dip-calculations/toInsertPayload";
+import { formatLiters, formatSignedLiters } from "@/lib/format-liters";
 
 export type TankType = {
   id: string;
@@ -29,11 +30,6 @@ type Props = {
   supabase: SupabaseClient;
   onSelectedChartChange: (chartNumber: string | null) => void;
 };
-
-function formatLiters(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `${Math.round(n).toLocaleString("en-CA")} L`;
-}
 
 function emptyToNull(s: string): string | null {
   const t = s.trim();
@@ -480,7 +476,7 @@ export default function TankSlot({
         />
         <ResultRow
           label="#7 Volume difference"
-          value={formatLiters(afterResult?.volumeDifferenceLiters)}
+          value={formatSignedLiters(afterResult?.volumeDifferenceLiters)}
         />
         {afterResult?.reversedDipWarning && (
           <WarningBanner>
