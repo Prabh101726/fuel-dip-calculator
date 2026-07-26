@@ -11,7 +11,8 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Operated by SRV Freight Inc. Last updated: July 26, 2026.
+        Operated by SRV Freight Inc and Detours Fleet Operations. Last
+        updated: July 26, 2026.
       </p>
 
       <div className="mt-8 space-y-6 text-sm leading-relaxed text-[var(--text)]">

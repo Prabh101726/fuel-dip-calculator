@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateAfterDelivery,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/dip-calculator/calculate";
 import { DipOutOfRangeError } from "@/lib/dip-calculator/interpolate";
 import type { DipChartPoint } from "@/lib/dip-calculator/types";
+import { isStaleTankPointsResponse } from "@/lib/dip-calculations/isStaleTankPointsResponse";
 import {
   toInsertPayload,
   type SafeFillPct,
@@ -102,6 +103,8 @@ export default function TankSlot({
   const [tankPoints, setTankPoints] = useState<DipChartPoint[]>([]);
   const [pointsLoading, setPointsLoading] = useState(false);
   const [pointsError, setPointsError] = useState("");
+  /** Latest selected tank id — used to drop stale dip-chart fetch results. */
+  const selectedTankIdRef = useRef<string | null>(null);
 
   const [safeFillPct, setSafeFillPct] = useState<SafeFillPct>(0.9);
   const [locationLabel, setLocationLabel] = useState("");
@@ -126,6 +129,7 @@ export default function TankSlot({
   }, [savedFlash]);
 
   function resetSlot() {
+    selectedTankIdRef.current = null;
     setTankQuery("");
     setSelectedTank(null);
     setTankPoints([]);
@@ -148,6 +152,7 @@ export default function TankSlot({
   }
 
   async function selectTank(tank: TankType) {
+    selectedTankIdRef.current = tank.id;
     setSelectedTank(tank);
     onSelectedChartChange(tank.chart_number);
     setTankQuery("");
@@ -159,6 +164,10 @@ export default function TankSlot({
       .select("dip_cm, volume_liters")
       .eq("tank_type_id", tank.id)
       .order("dip_cm");
+    // Another tank (or clear) won the race — do not touch loading/points state.
+    if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
+      return;
+    }
     setPointsLoading(false);
     if (error) {
       setPointsError(error.message);
@@ -174,6 +183,7 @@ export default function TankSlot({
   }
 
   function clearSelectedTankOnly() {
+    selectedTankIdRef.current = null;
     setSelectedTank(null);
     onSelectedChartChange(null);
     setTankPoints([]);
