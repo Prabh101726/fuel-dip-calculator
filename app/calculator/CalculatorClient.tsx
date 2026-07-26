@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { SAFETY_REMINDER } from "@/lib/app-copy";
 import { createClient } from "@/lib/supabase/client";
 import TankSlot, { type TankType } from "./TankSlot";
 
@@ -126,6 +127,10 @@ export default function CalculatorClient() {
         </div>
       </header>
 
+      <p className="mb-4 rounded-lg border border-[var(--warn)] bg-[var(--warn-bg)] px-3 py-2.5 text-sm font-medium text-[var(--warn-fg)]">
+        {SAFETY_REMINDER}
+      </p>
+
       <div className="mb-4 grid grid-cols-4 gap-2">
         {Array.from({ length: SLOT_COUNT }, (_, index) => {
           const chart = tabCharts[index];
@@ -167,6 +172,15 @@ export default function CalculatorClient() {
           </div>
         ))
       )}
+
+      <footer className="mt-10 flex gap-4 text-xs font-bold text-[var(--muted)]">
+        <Link href="/privacy" className="min-h-11 content-center hover:text-[var(--accent)]">
+          Privacy
+        </Link>
+        <Link href="/terms" className="min-h-11 content-center hover:text-[var(--accent)]">
+          Terms
+        </Link>
+      </footer>
     </main>
   );
 }

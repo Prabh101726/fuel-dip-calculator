@@ -102,6 +102,15 @@ export default async function HistoryPage() {
           );
         })}
       </ul>
+
+      <footer className="mt-10 flex gap-4 text-xs font-bold text-[var(--muted)]">
+        <Link href="/privacy" className="min-h-11 content-center hover:text-[var(--accent)]">
+          Privacy
+        </Link>
+        <Link href="/terms" className="min-h-11 content-center hover:text-[var(--accent)]">
+          Terms
+        </Link>
+      </footer>
     </main>
   );
 }

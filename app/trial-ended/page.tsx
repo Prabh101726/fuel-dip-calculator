@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CONTACT_EMAIL, TRIAL_DAYS } from "@/lib/app-copy";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TrialEndedPage() {
@@ -19,11 +21,18 @@ export default function TrialEndedPage() {
         Fuel Dip Calculator
       </p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--text)]">
-        Your 14-day trial has ended
+        Your {TRIAL_DAYS}-day trial has ended
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-        Calculator and history are locked for this account. Contact us if you want
-        to continue after the trial.
+        Calculator and history are locked for this account. Paid plans at
+        $4.99/month are coming soon. Contact{" "}
+        <a
+          className="font-bold text-[var(--accent)]"
+          href={`mailto:${CONTACT_EMAIL}`}
+        >
+          {CONTACT_EMAIL}
+        </a>{" "}
+        if you want to continue after the trial.
       </p>
       <button
         type="button"
@@ -32,6 +41,14 @@ export default function TrialEndedPage() {
       >
         Log out
       </button>
+      <footer className="mt-10 flex gap-4 text-xs font-bold text-[var(--muted)]">
+        <Link href="/privacy" className="min-h-11 content-center hover:text-[var(--accent)]">
+          Privacy
+        </Link>
+        <Link href="/terms" className="min-h-11 content-center hover:text-[var(--accent)]">
+          Terms
+        </Link>
+      </footer>
     </main>
   );
 }
