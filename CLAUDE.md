@@ -80,7 +80,7 @@ live now. The foundation implementation plan is at
 - `app/auth/callback/route.ts` — exchanges an auth code for a session, calls
   the `ensure_trial_driver()` RPC (auto-provisions `companies` + `drivers` on
   first login/signup only, 7-day trial for new companies via
-  `companies.trial_ends_at` — see `20260726140000_seven_day_trial.sql`).
+  `companies.trial_ends_at` — see `20260726175154_seven_day_trial.sql`).
 - `app/calculator/page.tsx` — thin wrapper using `next/dynamic({ ssr: false })`
   around `CalculatorClient.tsx`. Originally the single-tank flow directly;
   **superseded same week, see "Multi-tank calculator" below** — the `ssr: false`
@@ -128,7 +128,7 @@ Soft-launch hardening before wider driver use. Spec:
 - **Legal:** `/privacy` and `/terms` are public (middleware allow-list).
   Create-account requires Terms + Privacy checkbox. Shared contact:
   **`contact@detours-app.com`** (`CONTACT_EMAIL` in `lib/app-copy.ts`).
-- **Trial:** migration `20260726140000_seven_day_trial.sql` — 7-day default
+- **Trial:** migration `20260726175154_seven_day_trial.sql` — 7-day default
   and `ensure_trial_driver()` insert; existing companies unchanged.
 - **Billing:** trial-ended and login copy mention planned **$4.99/month**; no
   Stripe integration this pass.

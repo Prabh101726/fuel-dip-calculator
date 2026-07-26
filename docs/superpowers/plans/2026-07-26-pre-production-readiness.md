@@ -31,7 +31,7 @@
 | --- | --- |
 | `lib/app-copy.ts` | Shared constants: contact email, safety reminder, trial days label helpers |
 | `lib/app-copy.test.ts` | Unit tests for constants / URL helpers |
-| `supabase/migrations/20260726140000_seven_day_trial.sql` | Default + `ensure_trial_driver()` → 7 days |
+| `supabase/migrations/20260726175154_seven_day_trial.sql` | Default + `ensure_trial_driver()` → 7 days |
 | `lib/supabase/middleware.ts` | Public allow-list: `/privacy`, `/terms` |
 | `app/privacy/page.tsx` | Privacy Policy page |
 | `app/terms/page.tsx` | Terms of Use page |
@@ -129,7 +129,7 @@ git commit -m "feat: add shared pre-prod copy and auth URL helpers"
 ### Task 2: Seven-day trial migration
 
 **Files:**
-- Create: `supabase/migrations/20260726140000_seven_day_trial.sql`
+- Create: `supabase/migrations/20260726175154_seven_day_trial.sql`
 
 **Interfaces:**
 - Consumes: existing `ensure_trial_driver()` / `companies.trial_ends_at`
@@ -206,7 +206,7 @@ Expected: expression includes `7 days`. Do **not** run an update that rewrites e
 - [ ] **Step 4: Commit**
 
 ```bash
-git add supabase/migrations/20260726140000_seven_day_trial.sql
+git add supabase/migrations/20260726175154_seven_day_trial.sql
 git commit -m "feat: shorten new company trials to 7 days"
 ```
 
