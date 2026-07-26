@@ -13,9 +13,13 @@ Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 (all Jul 23-24 2026) merged to `main` and **live in production**:
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Email/password login (see below — replaced magic-link the same day it shipped),
-a 14-day trial with auto-provisioned company/driver on first login/signup, a
-**4-tab multi-tank calculator** screen, and a flat history list are all built
-and deployed. Read
+a **7-day trial** for newly provisioned companies (Jul 26 pre-prod pass; was
+14-day at launch — existing `trial_ends_at` rows are not backfilled), with
+auto-provisioned company/driver on first confirmed signup/login, a **4-tab
+multi-tank calculator** screen, public `/privacy` and `/terms`, and a flat
+history list. Core calculator shipped Jul 23–24; pre-production readiness
+(Jul 26) adds email-confirmation redirects, forgot-password, legal pages, and
+safety copy — see below. Read
 `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md` for the
 original v1 data model/workflow spec — **note the auth model has since
 diverged from it twice**: the spec assumed simple email/password with no
@@ -33,16 +37,17 @@ live now. The foundation implementation plan is at
   branches"; add via Vercel dashboard → Settings → Environment Variables, or
   retry with an updated `vercel` CLI (`npm i -g vercel@latest`, needs sudo
   here).
-- Supabase Auth redirect allow-list needs
-  `https://fuel-dip-calculator.vercel.app/auth/callback` added by hand
-  (Supabase Dashboard → Authentication → URL Configuration) — deliberately
-  NOT pushed via `supabase config push`, since that would send the whole
-  local `config.toml` (including local-dev `site_url`) to the live project
-  and could clobber auth settings configured directly in the dashboard.
-- Signature capture (image, not typed name), paid billing beyond the trial
-  clock, and history filtering are still explicitly deferred (see
-  `docs/next-task-cursor.md`'s Out of Scope section — now describing the
-  multi-tank task, superseding the single-tank brief it replaced).
+- After deploying pre-prod auth redirects: add Supabase Auth redirect allow-list
+  entries for `/auth/callback` and `/auth/reset-password`, **then** enable
+  Confirm email. Do not enable Confirm email before that deploy.
+- Planned $4.99/month billing is copy-only; Stripe still deferred.
+- Do **not** push full local `supabase/config.toml` via `supabase config push`
+  (risk of clobbering dashboard auth settings); use the dashboard for Auth URL
+  and email-confirm toggles.
+- Signature capture (image, not typed name), Stripe Checkout / webhooks, and
+  history filtering are still explicitly deferred (see
+  `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md` Out
+  of Scope; older `docs/next-task-cursor.md` multi-tank brief is superseded).
 
 ## What's built (foundation phase)
 
@@ -74,7 +79,8 @@ live now. The foundation implementation plan is at
   sign-in; **superseded same day, see "Auth: magic-link → password" below.**
 - `app/auth/callback/route.ts` — exchanges an auth code for a session, calls
   the `ensure_trial_driver()` RPC (auto-provisions `companies` + `drivers` on
-  first login/signup only, 14-day trial via `companies.trial_ends_at`).
+  first login/signup only, 7-day trial for new companies via
+  `companies.trial_ends_at` — see `20260726140000_seven_day_trial.sql`).
 - `app/calculator/page.tsx` — thin wrapper using `next/dynamic({ ssr: false })`
   around `CalculatorClient.tsx`. Originally the single-tank flow directly;
   **superseded same week, see "Multi-tank calculator" below** — the `ssr: false`
@@ -102,10 +108,30 @@ modes, both calling `supabase.auth.signInWithPassword` /
 unchanged — only the credential mechanism changed. A stale `otp_expired` /
 `access_denied` URL error is caught and shown as "that email link expired,
 sign in with email and password instead" (leftover magic-link links a driver
-might still have). The Supabase Auth redirect allow-list step in "Still open"
-above is no longer needed for this flow specifically, but leave it — other
-auth code paths (`/auth/callback`) still exist and email confirmation may use
-it depending on dashboard settings.
+might still have).
+
+## Pre-production readiness (Jul 26 2026)
+
+Soft-launch hardening before wider driver use. Spec:
+`docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`.
+
+- **Email confirmation:** `LoginForm` `signUp` passes `options.emailRedirectTo`
+  to `{origin}/auth/callback` (`lib/app-copy.ts` helpers). Unconfirmed users
+  have no session; middleware already blocks `/calculator` and `/history`.
+  Enable **Confirm email** in Supabase only after deploy + redirect allow-list
+  (ops ordering in "Still open" above).
+- **Forgot password:** `resetPasswordForEmail` with `redirectTo` →
+  `/auth/reset-password`. That page exchanges the auth code locally and calls
+  `updateUser({ password })` — **do not** route recovery through
+  `/auth/callback` (trial gate / `ensure_trial_driver()` would block expired-trial
+  users from resetting).
+- **Legal:** `/privacy` and `/terms` are public (middleware allow-list).
+  Create-account requires Terms + Privacy checkbox. Shared contact:
+  **`contact@detours-app.com`** (`CONTACT_EMAIL` in `lib/app-copy.ts`).
+- **Trial:** migration `20260726140000_seven_day_trial.sql` — 7-day default
+  and `ensure_trial_driver()` insert; existing companies unchanged.
+- **Billing:** trial-ended and login copy mention planned **$4.99/month**; no
+  Stripe integration this pass.
 
 ## Multi-tank calculator (Jul 24 2026)
 
