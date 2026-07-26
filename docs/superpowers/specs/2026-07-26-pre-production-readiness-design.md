@@ -170,7 +170,7 @@ structure stay stable so legal can replace copy later without rewiring.
 Exact string (or equivalent approved tweak at implementation):
 
 > Safety first: always verify the physical tank tag matches the chart number
-> before delivery.
+> and given site plan Tank charts before delivery.
 
 ### 3.2 Placement
 

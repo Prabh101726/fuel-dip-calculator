@@ -15,7 +15,7 @@
 - Contact email everywhere: `contact@detours-app.com`
 - Operator name: `SRV Freight Inc`
 - New trial length: **7 days**; do **not** rewrite existing `companies.trial_ends_at`
-- Safety copy (exact): `Safety first: always verify the physical tank tag matches the chart number before delivery.`
+- Safety copy (exact): `Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.`
 - Planned price copy: `$4.99/month` — messaging only, no Stripe/schema
 - `signUp` must pass `options.emailRedirectTo` → `{origin}/auth/callback`
 - `resetPasswordForEmail` must pass `redirectTo` → `{origin}/auth/reset-password`
@@ -53,7 +53,7 @@
 **Interfaces:**
 - Produces:
   - `CONTACT_EMAIL = "contact@detours-app.com"`
-  - `SAFETY_REMINDER = "Safety first: always verify the physical tank tag matches the chart number before delivery."`
+  - `SAFETY_REMINDER = "Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery."`
   - `TRIAL_DAYS = 7`
   - `authCallbackUrl(origin: string): string`
   - `resetPasswordUrl(origin: string): string`
@@ -99,7 +99,7 @@ Expected: FAIL (module not found)
 export const CONTACT_EMAIL = "contact@detours-app.com";
 
 export const SAFETY_REMINDER =
-  "Safety first: always verify the physical tank tag matches the chart number before delivery.";
+  "Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.";
 
 export const TRIAL_DAYS = 7;
 

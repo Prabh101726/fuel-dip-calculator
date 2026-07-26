@@ -10,7 +10,9 @@ import {
 describe("app-copy", () => {
   it("locks contact, safety, and trial length", () => {
     expect(CONTACT_EMAIL).toBe("contact@detours-app.com");
-    expect(SAFETY_REMINDER).toContain("tank tag");
+    expect(SAFETY_REMINDER).toBe(
+      "Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.",
+    );
     expect(TRIAL_DAYS).toBe(7);
   });
 

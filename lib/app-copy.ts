@@ -1,7 +1,7 @@
 export const CONTACT_EMAIL = "contact@detours-app.com";
 
 export const SAFETY_REMINDER =
-  "Safety first: always verify the physical tank tag matches the chart number before delivery.";
+  "Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.";
 
 export const TRIAL_DAYS = 7;
 
