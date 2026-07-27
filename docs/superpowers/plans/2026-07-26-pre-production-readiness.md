@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Soft-launch harden the live Fuel Dip Calculator: email confirmation redirects, 7-day trials for new companies, Privacy/Terms, safety reminders, forgot-password, and $4.99 coming-soon messaging — no Stripe.
+**Goal:** Soft-launch harden the live Fuel Dip Calculator: email confirmation redirects, 7-day trials for new companies, Privacy/Terms, safety reminders, forgot-password, and $2.99 coming-soon messaging — no Stripe.
 
 **Architecture:** Keep open signup. Wire Supabase confirm/reset emails to absolute app URLs (`emailRedirectTo` / `redirectTo`). New companies get a 7-day `trial_ends_at` via migration + `ensure_trial_driver()` change. Public `/privacy` and `/terms` pages; shared constants for contact email and safety copy. Password recovery lands on `/auth/reset-password`, which exchanges the PKCE code itself and never runs the trial gate.
 
@@ -16,7 +16,7 @@
 - Operator name: `SRV Freight Inc`
 - New trial length: **7 days**; do **not** rewrite existing `companies.trial_ends_at`
 - Safety copy (exact): `Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.`
-- Planned price copy: `$4.99/month` — messaging only, no Stripe/schema
+- Planned price copy: `$2.99/month` — messaging only, no Stripe/schema
 - `signUp` must pass `options.emailRedirectTo` → `{origin}/auth/callback`
 - `resetPasswordForEmail` must pass `redirectTo` → `{origin}/auth/reset-password`
 - **Reset-password must NOT go through `/auth/callback`** (that route runs the trial gate and would bounce expired-trial users to `/trial-ended` before they can set a password). `/auth/reset-password` exchanges the code itself (or via middleware session refresh) and skips all trial checks.
@@ -39,7 +39,7 @@
 | `app/auth/reset-password/page.tsx` | Client page: exchange code, set new password, no trial gate |
 | `app/calculator/CalculatorClient.tsx` | Safety banner + legal footer |
 | `app/history/page.tsx` | Legal footer |
-| `app/trial-ended/page.tsx` | 7-day + $4.99 + contact copy + legal footer |
+| `app/trial-ended/page.tsx` | 7-day + $2.99 + contact copy + legal footer |
 | `CLAUDE.md` | Document ops ordering + what shipped |
 
 ---
@@ -389,7 +389,7 @@ export default function TermsPage() {
           <h2 className="text-base font-bold">Trial and paid plans</h2>
           <p className="text-[var(--muted)]">
             New accounts receive a {TRIAL_DAYS}-day trial. We plan to offer paid
-            access at $4.99 per month per account. Payment processing is not
+            access at $2.99 per month per account. Payment processing is not
             live yet; after the trial, calculator and history access may be
             locked until a paid plan is available or access is arranged.
           </p>
@@ -832,7 +832,7 @@ At end of history `<main>`:
 
 (`Link` already imported.)
 
-- [ ] **Step 3: Trial-ended — 7-day + $4.99 + contact**
+- [ ] **Step 3: Trial-ended — 7-day + $2.99 + contact**
 
 Replace page body copy with:
 
@@ -864,7 +864,7 @@ export default function TrialEndedPage() {
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
         Calculator and history are locked for this account. Paid plans at
-        $4.99/month are coming soon. Contact{" "}
+        $2.99/month are coming soon. Contact{" "}
         <a
           className="font-bold text-[var(--accent)]"
           href={`mailto:${CONTACT_EMAIL}`}
@@ -925,7 +925,7 @@ In `CLAUDE.md`:
 - After deploying pre-prod auth redirects: add Supabase Auth redirect allow-list
   entries for `/auth/callback` and `/auth/reset-password`, **then** enable
   Confirm email. Do not enable Confirm email before that deploy.
-- Planned $4.99/month billing is copy-only; Stripe still deferred.
+- Planned $2.99/month billing is copy-only; Stripe still deferred.
 ```
 
 - [ ] **Step 2: Commit**
@@ -952,7 +952,7 @@ Do **after** Tasks 1–8 are merged and deployed to production:
    - Forgot password → reset page works even if you temporarily set a test company `trial_ends_at` in the past
    - `/privacy` `/terms` load logged out
    - Safety banner on login + calculator
-   - Trial-ended shows $4.99 + `contact@detours-app.com`
+   - Trial-ended shows $2.99 + `contact@detours-app.com`
 
 No commit for this task — checkbox in PR description / handoff notes.
 
@@ -971,7 +971,7 @@ No commit for this task — checkbox in PR description / handoff notes.
 | `/privacy` `/terms` public | Tasks 3–4 |
 | Contact `contact@detours-app.com` | Tasks 1, 4, 7 |
 | Safety soft reminder login + calculator | Tasks 5, 7 |
-| Trial-ended $4.99 coming soon | Task 7 |
+| Trial-ended $2.99 coming soon | Task 7 |
 | Ops ordering deploy → allow-list → Confirm email | Task 9 + CLAUDE.md |
 | No Stripe / no new tables | Global constraints |
 
