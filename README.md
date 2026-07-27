@@ -62,6 +62,7 @@ Built under **SRV Freight Inc** / **Detours Fleet Operations**, separate from
 | Doc | What |
 | --- | --- |
 | [`CLAUDE.md`](CLAUDE.md) | Agent/product guide — current live behavior & constraints |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting & soft-launch security posture |
 | [`docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`](docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md) | Original v1 design (auth has since diverged) |
 | [`docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`](docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md) | Pre-production readiness spec |
 | [`docs/superpowers/plans/2026-07-26-pre-production-readiness.md`](docs/superpowers/plans/2026-07-26-pre-production-readiness.md) | Pre-production implementation plan |
