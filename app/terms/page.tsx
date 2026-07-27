@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CONTACT_EMAIL, TRIAL_DAYS } from "@/lib/app-copy";
+import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
 
 export default function TermsPage() {
   return (
@@ -40,7 +40,7 @@ export default function TermsPage() {
           <h2 className="text-base font-bold">Trial and paid plans</h2>
           <p className="text-[var(--muted)]">
             New accounts receive a {TRIAL_DAYS}-day trial. We plan to offer paid
-            access at $4.99 per month per account. Payment processing is not
+            access at {MONTHLY_PRICE_LABEL} per account. Payment processing is not
             live yet; after the trial, calculator and history access may be
             locked until a paid plan is available or access is arranged.
           </p>

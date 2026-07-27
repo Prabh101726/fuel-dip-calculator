@@ -10,7 +10,7 @@ The calculator core (password auth, **14-day** trial provisioning, 4-tab
 multi-tank flow, history) is working in production. This pass makes the live
 app safer for real drivers and soft launch: harden open signup with email
 confirmation, shorten **new** trials to **7 days**, ship legal pages, surface
-safety reminders, and document the planned $4.99/month subscription without
+safety reminders, and document the planned $2.99/month subscription without
 building Stripe yet.
 
 ## Decisions (locked)
@@ -23,7 +23,7 @@ building Stripe yet.
 | Existing trials | Leave current `trial_ends_at` unchanged |
 | Legal | Plain-language Privacy + Terms drafts under SRV Freight Inc |
 | Safety messaging | Soft reminder on login + calculator (no checkbox / no save gate) |
-| Billing this pass | Spec + copy only; planned **$4.99/month**; no Stripe |
+| Billing this pass | Spec + copy only; planned **$2.99/month**; no Stripe |
 
 ## Out of scope
 
@@ -145,7 +145,7 @@ shared across products). Same address on Privacy, Terms, and trial-ended.
 - Safety / responsibility: drivers must verify tank tags match the selected
   chart; the app assists and does not replace site procedures or professional
   judgment
-- Trial (7 days) and planned paid subscription ($4.99/month) — payment not
+- Trial (7 days) and planned paid subscription ($2.99/month) — payment not
   live yet
 - Acceptable use
 - Limitation of liability appropriate for a soft-launch draft
@@ -189,7 +189,7 @@ Exact string (or equivalent approved tweak at implementation):
 
 ### 4.1 Planned offer
 
-- **$4.99 per month per account** (v1 = one auto-provisioned driver per signup;
+- **$2.99 per month per account** (v1 = one auto-provisioned driver per signup;
   revisit if multi-driver companies become real)
 - Not collectable in this pass
 
@@ -199,7 +199,7 @@ Update copy to:
 
 - State the **7-day** trial has ended
 - Calculator and history are locked
-- Paid plans at **$4.99/month** are coming soon
+- Paid plans at **$2.99/month** are coming soon
 - Contact email to continue / request access
 - Keep log out
 
@@ -266,5 +266,5 @@ email confirm toggles.
 - New companies get a 7-day trial; existing trials untouched
 - Privacy + Terms live and linked; signup requires acceptance
 - Safety reminder visible on login and calculator
-- Trial-ended communicates 7-day trial + upcoming $4.99/month + contact
+- Trial-ended communicates 7-day trial + upcoming $2.99/month + contact
 - Ops checklist documented; contact email is `contact@detours-app.com`

@@ -27,7 +27,7 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged twice** — magic-link trial → password auth; password is live).
 
 **Still open / next priorities:**
-- **Stripe after trial** — `$4.99/month` is copy-only on `/trial-ended` today;
+- **Stripe after trial** — `$2.99/month` is copy-only on `/trial-ended` today;
   Checkout + webhook + subscription unlock not built (est. ~2–3 days MVP /
   ~4–6 days solid). Preferred next product build over offline.
 - **PWA / offline** — still a plain responsive web app. Install-only ~0.5–1
@@ -128,7 +128,8 @@ plan under `docs/superpowers/`.
   tank charts before delivery.
 - **Trial:** migration `20260726175154_seven_day_trial.sql` — 7-day default +
   `ensure_trial_driver()` insert; existing companies unchanged. Trial-ended
-  page mentions planned **$4.99/month** (copy only).
+  page mentions planned **$2.99/month** (copy only; `MONTHLY_PRICE_LABEL` in
+  `lib/app-copy.ts`).
 - **Tank-chart race fix** (commit `c6c012a`): `TankSlot` keeps
   `selectedTankIdRef` and ignores stale `dip_chart_points` responses via
   `isStaleTankPointsResponse()` so a slow fetch for tank A cannot overwrite

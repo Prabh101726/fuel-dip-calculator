@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CONTACT_EMAIL, TRIAL_DAYS } from "@/lib/app-copy";
+import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TrialEndedPage() {
@@ -24,8 +24,8 @@ export default function TrialEndedPage() {
         Your {TRIAL_DAYS}-day trial has ended
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-        Calculator and history are locked for this account. Paid plans at
-        $4.99/month are coming soon. Contact{" "}
+        Calculator and history are locked for this account. Paid plans at{" "}
+        {MONTHLY_PRICE_LABEL} are coming soon. Contact{" "}
         <a
           className="font-bold text-[var(--accent)]"
           href={`mailto:${CONTACT_EMAIL}`}
