@@ -10,29 +10,31 @@ dip and get delivered volume + reconciliation.
 Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 
 **Status:** Foundation (Jul 23), driver-facing + password auth (Jul 23),
-multi-tank calculator (Jul 24), and **pre-production readiness (Jul 26)** are
-merged to `main` and **live in production**:
+multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**, and
+**calculator form UX (Jul 28)** are merged to `main` and **live in production**:
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: email/password signup with Confirm email, forgot-password /
 `/auth/reset-password`, **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
 company/driver on first confirmed signup or sign-in, 4-tab multi-tank
-calculator, public `/privacy` + `/terms`, safety reminders, and flat history.
+calculator with **product-grade dropdown** (tab labels show product when
+selected), public `/privacy` + `/terms`, safety reminders, and flat history.
 Jul 26 also fixed a safety-critical tank-picker race (stale dip-chart fetch)
 and named operators **SRV Freight Inc and Detours Fleet Operations** on legal
-pages. Spec/plan:
+pages. Current soft-launch tag: **v0.2.0**. Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
-`docs/superpowers/plans/2026-07-26-pre-production-readiness.md`. Original v1
+`docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged twice** — magic-link trial → password auth; password is live).
 
 **Still open / next priorities:**
+- **PWA / full offline (Project 2)** — still a plain responsive web app.
+  Planned: installable shell, cache dip charts, offline calc, queued saves,
+  drafts that survive swipe-up. Est. ~1–2 weeks. Schema allows offline queue
+  later without rewrite; don't build until asked.
 - **Stripe after trial** — `$2.99/month` is copy-only on `/trial-ended` today;
   Checkout + webhook + subscription unlock not built (est. ~2–3 days MVP /
-  ~4–6 days solid). Preferred next product build over offline.
-- **PWA / offline** — still a plain responsive web app. Install-only ~0.5–1
-  day; offline calc + queued saves ~1–2 weeks. Schema allows a later offline
-  queue without rewrite; don't build until asked.
+  ~4–6 days solid).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - Security hardenings from Jul 26 audit (not yet coded): enforce trial/paid in
@@ -145,29 +147,37 @@ single-tank v1 that had explicitly deferred this:
 
 - `CalculatorClient.tsx` is now a thin shell: auth/driver/company lookup, one
   shared `tank_types` fetch (not refetched per tab), a 4-button tab bar
-  (`SLOT_COUNT = 4`, always visible, labeled `Tank 1`-`Tank 4` until a tank is
-  picked, then the tank's chart number e.g. `#526`), and mounts all 4
-  `<TankSlot>` instances simultaneously — inactive ones are hidden via CSS
-  (`hidden`/`aria-hidden`), **never unmounted**, so each tab's state (selected
-  tank, dip inputs, results) survives switching tabs. This is the load-bearing
-  bit — don't refactor tab-switching to conditionally mount/unmount, it would
-  silently wipe a driver's in-progress entry on another tab.
-- `app/calculator/TankSlot.tsx` — the actual single-tank form (tank picker,
-  safe-fill %, before/after dip fields + results, warnings, retain/signature
-  fields, save), extracted verbatim from the old `CalculatorClient` — the
-  calculation logic itself (`calculateBeforeDelivery`/`calculateAfterDelivery`)
-  was **not** touched. Still inserts one independent row per tank into
-  `dip_calculations` — no "session"/"visit" grouping concept exists or is
-  needed, since the schema already keys per-calculation on `tank_type_id`.
-  Reports its selected chart number up to the shell via
-  `onSelectedChartChange` for the tab label.
-- **Clear button** next to Save resets only that slot's own state
-  (`resetSlot()`) back to blank defaults — doesn't touch the other 3 tabs.
-- **Save no longer redirects to `/history`.** On successful save, the slot
-  calls `resetSlot()` and shows a 2.5s "Saved ✓" flash (`savedFlash` state)
-  instead, so the driver stays on the calculator to do the next tank. The
-  `History` link in the header is unchanged for whenever they want to review
-  past saves.
+  (`SLOT_COUNT = 4`, always visible), and mounts all 4 `<TankSlot>` instances
+  simultaneously — inactive ones are hidden via CSS (`hidden`/`aria-hidden`),
+  **never unmounted**, so each tab's state (selected tank, dip inputs, results)
+  survives switching tabs. This is the load-bearing bit — don't refactor
+  tab-switching to conditionally mount/unmount, it would silently wipe a
+  driver's in-progress entry on another tab.
+- **Tab labels** (Jul 28): product grade if set → else `#chart` if tank picked
+  → else `Tank N`. Uses `tankTabLabel()` in `lib/product-grades.ts`. Slots
+  report chart via `onSelectedChartChange` and product via
+  `onSelectedProductChange`.
+- `app/calculator/TankSlot.tsx` — per-tank form (tank picker, safe-fill %,
+  product dropdown, before/after dips + results, location under after-delivery,
+  retain/signature, save). Calculation logic
+  (`calculateBeforeDelivery`/`calculateAfterDelivery`) was **not** changed.
+  Still inserts one independent row per tank into `dip_calculations`.
+- **Clear button** next to Save resets only that slot (`resetSlot()`) —
+  doesn't touch the other 3 tabs.
+- **Save no longer redirects to `/history`.** On success, `resetSlot()` + 2.5s
+  "Saved ✓" flash so the driver can continue other tanks.
+
+## Calculator form UX (Jul 28 2026)
+
+Spec: `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`
+(commit `4ff9e49`).
+
+- **Product grade** dropdown from `PRODUCT_GRADES` in `lib/product-grades.ts`:
+  E15 Reg, E10 Reg, P93, P91, PE10, U94, LSD Clear, LSD Dyed (optional
+  “Select product…”). Still stored as `product_grade` text.
+- **Compartment #** removed from UI; saves `compartment_no: null` (column kept).
+- **Location label** moved to the bottom of the After delivery section.
+- No schema migration.
 
 ## Load-bearing constraints
 
@@ -185,10 +195,10 @@ single-tank v1 that had explicitly deferred this:
   safe-fill % directly per calculation, with a free-text location label. Don't
   reintroduce a `sites` table without checking the spec's "Out of Scope" section
   first; it was cut deliberately to avoid upfront admin setup blocking driver use.
-- **Still a plain responsive web app, no offline/PWA** (Jul 26). Schema should
-  still support an offline save queue later without a rewrite; don't build PWA /
-  offline until asked — Stripe-after-trial is the preferred next product build.
-
+- **Still a plain responsive web app, no offline/PWA.** Schema should still
+  support an offline save queue later without a rewrite; Project 2 (full
+  offline PWA) is the planned next large build when asked — don't start it
+  unprompted.
 ## Source data
 
 - `~/Downloads/FLT - DIPCHARTS (1) 2.pdf` — 327-page dip chart catalog, real
