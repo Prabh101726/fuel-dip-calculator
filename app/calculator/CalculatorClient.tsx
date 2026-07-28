@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SAFETY_REMINDER } from "@/lib/app-copy";
+import { tankTabLabel } from "@/lib/product-grades";
 import { createClient } from "@/lib/supabase/client";
 import TankSlot, { type TankType } from "./TankSlot";
 
@@ -21,6 +22,9 @@ export default function CalculatorClient() {
   const [tabCharts, setTabCharts] = useState<(string | null)[]>(() =>
     Array.from({ length: SLOT_COUNT }, () => null),
   );
+  const [tabProducts, setTabProducts] = useState<(string | null)[]>(() =>
+    Array.from({ length: SLOT_COUNT }, () => null),
+  );
 
   const chartSetters = useMemo(
     () =>
@@ -30,6 +34,21 @@ export default function CalculatorClient() {
             if (prev[index] === chartNumber) return prev;
             const next = [...prev];
             next[index] = chartNumber;
+            return next;
+          });
+        };
+      }),
+    [],
+  );
+
+  const productSetters = useMemo(
+    () =>
+      Array.from({ length: SLOT_COUNT }, (_, index) => {
+        return (productGrade: string | null) => {
+          setTabProducts((prev) => {
+            if (prev[index] === productGrade) return prev;
+            const next = [...prev];
+            next[index] = productGrade;
             return next;
           });
         };
@@ -133,8 +152,11 @@ export default function CalculatorClient() {
 
       <div className="mb-4 grid grid-cols-4 gap-2">
         {Array.from({ length: SLOT_COUNT }, (_, index) => {
-          const chart = tabCharts[index];
-          const label = chart ? `#${chart}` : `Tank ${index + 1}`;
+          const label = tankTabLabel({
+            productGrade: tabProducts[index],
+            chartNumber: tabCharts[index],
+            slotIndex: index,
+          });
           const active = activeTab === index;
           return (
             <button
@@ -168,6 +190,7 @@ export default function CalculatorClient() {
               companyId={companyId}
               supabase={supabase}
               onSelectedChartChange={chartSetters[index]}
+              onSelectedProductChange={productSetters[index]}
             />
           </div>
         ))

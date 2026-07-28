@@ -16,6 +16,7 @@ import {
   type SafeFillPct,
 } from "@/lib/dip-calculations/toInsertPayload";
 import { formatLiters, formatSignedLiters } from "@/lib/format-liters";
+import { PRODUCT_GRADES } from "@/lib/product-grades";
 
 export type TankType = {
   id: string;
@@ -30,6 +31,7 @@ type Props = {
   companyId: string;
   supabase: SupabaseClient;
   onSelectedChartChange: (chartNumber: string | null) => void;
+  onSelectedProductChange: (productGrade: string | null) => void;
 };
 
 function emptyToNull(s: string): string | null {
@@ -97,6 +99,7 @@ export default function TankSlot({
   companyId,
   supabase,
   onSelectedChartChange,
+  onSelectedProductChange,
 }: Props) {
   const [tankQuery, setTankQuery] = useState("");
   const [selectedTank, setSelectedTank] = useState<TankType | null>(null);
@@ -109,7 +112,6 @@ export default function TankSlot({
   const [safeFillPct, setSafeFillPct] = useState<SafeFillPct>(0.9);
   const [locationLabel, setLocationLabel] = useState("");
   const [productGrade, setProductGrade] = useState("");
-  const [compartmentNo, setCompartmentNo] = useState("");
   const [beforeDipCm, setBeforeDipCm] = useState("");
   const [plannedDeliveryLiters, setPlannedDeliveryLiters] = useState("");
   const [afterDipCm, setAfterDipCm] = useState("");
@@ -138,7 +140,6 @@ export default function TankSlot({
     setSafeFillPct(0.9);
     setLocationLabel("");
     setProductGrade("");
-    setCompartmentNo("");
     setBeforeDipCm("");
     setPlannedDeliveryLiters("");
     setAfterDipCm("");
@@ -149,6 +150,7 @@ export default function TankSlot({
     setSaveError("");
     setSaving(false);
     onSelectedChartChange(null);
+    onSelectedProductChange(null);
   }
 
   async function selectTank(tank: TankType) {
@@ -296,7 +298,7 @@ export default function TankSlot({
       locationLabel: emptyToNull(locationLabel),
       safeFillPct,
       productGrade: emptyToNull(productGrade),
-      compartmentNo: emptyToNull(compartmentNo),
+      compartmentNo: null,
       safeFillLiters: beforeResult.safeFillLiters,
       beforeDipCm: beforeDip,
       beforeVolumeLiters: beforeResult.beforeVolumeLiters,
@@ -413,24 +415,30 @@ export default function TankSlot({
             </button>
           ))}
         </div>
-        <Field
-          label="Location label"
-          value={locationLabel}
-          onChange={setLocationLabel}
-          optional
-        />
-        <Field
-          label="Product grade"
-          value={productGrade}
-          onChange={setProductGrade}
-          optional
-        />
-        <Field
-          label="Compartment #"
-          value={compartmentNo}
-          onChange={setCompartmentNo}
-          optional
-        />
+        <label className="block">
+          <span className="text-xs font-extrabold uppercase tracking-wide text-[var(--muted)]">
+            Product grade{" "}
+            <span className="font-medium normal-case tracking-normal text-[var(--muted)]">
+              (optional)
+            </span>
+          </span>
+          <select
+            value={productGrade}
+            onChange={(e) => {
+              const next = e.target.value;
+              setProductGrade(next);
+              onSelectedProductChange(next === "" ? null : next);
+            }}
+            className="mt-1.5 min-h-12 w-full rounded-lg border border-[var(--border)] bg-[var(--input)] px-3 text-[var(--text)] outline-none focus:border-[var(--accent)]"
+          >
+            <option value="">Select product…</option>
+            {PRODUCT_GRADES.map((grade) => (
+              <option key={grade} value={grade}>
+                {grade}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
 
       <section className="mt-4 space-y-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4">
@@ -499,6 +507,12 @@ export default function TankSlot({
             After-delivery volume exceeds the safe-fill limit for this tank.
           </WarningBanner>
         )}
+        <Field
+          label="Location label"
+          value={locationLabel}
+          onChange={setLocationLabel}
+          optional
+        />
       </section>
 
       {dipError !== "" && (
