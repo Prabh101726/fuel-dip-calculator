@@ -1,157 +1,88 @@
-# Next Task for Cursor — Offline PWA (Project 2)
+# Next Task for Cursor — Security Hardenings (Jul 26 audit)
 
-Amended brief after plan review (Jul 29 2026). Cursor’s architecture is
-**approved**; **A1–A5 below are required** — A1 is a hard blocker (without it
-the app does not work offline).
+Green-lit Jul 29 2026 (plan `security_hardenings_db1345c1` + two SQL notes).
+Repo: `~/dev/fuel-dip-calculator`, `main`. Soft-launch tag **v0.2.0**.
 
-Repo: `~/dev/fuel-dip-calculator` (`https://github.com/Prabh101726/fuel-dip-calculator`),
-`main` branch. Soft-launch tag **v0.2.0**. Do **not** change `lib/dip-calculator/`.
+Do **not** change `lib/dip-calculator/` or the offline PWA layer. Do **not**
+`supabase config push`.
 
 ## Locked decisions
 
-| Topic | Choice |
+| ID | Choice |
 | --- | --- |
-| Ship style | All-at-once (install + drafts + used-tank charts + offline calc + save queue) |
-| Chart cache | Only tanks the driver has opened **online** at least once |
-| Auth | Must have signed in while **online** first; no anonymous offline calculator |
-| History | **Online only** — do not build offline history |
-| Drafts | Survive swipe-up / kill (IndexedDB), restore on remount |
-| Tech | Serwist (`@serwist/next`) + IndexedDB via `idb` |
-| SW caching | App shell only — **do not** cache Supabase API responses in the SW |
+| H1 | `my_trial_active()` + recreate insert/update RLS; SELECT ungated |
+| H2 | Store-both: keep client volumes; add `server_*` + `volume_mismatch`; never block save |
+| H2 trigger | `BEFORE INSERT OR UPDATE` (not INSERT-only) |
+| H2 null after | Null `after_dip_cm` is **not** a mismatch by itself |
+| H3 | Manual: Supabase Dashboard → Auth → Passwords → leaked-password protection |
+| H4 | `next` allowlist: exactly `/calculator` or `/history`, else `/calculator` |
 
-## Architecture (approved)
+## H1 — Trial in RLS
 
-- Serwist service worker + web app manifest (standalone, icons under `public/`)
-- IndexedDB stores: `charts`, `drafts`, `outbox` (+ small `session`/meta for boot — see A1/A2)
-- Write-through chart cache on successful online `dip_chart_points` load
-- Debounced draft autosave; clear per-slot on Save / Clear
-- Offline/online banner + pending outbox count
-- History page unchanged (needs network)
+Migration adds:
 
+```sql
+create or replace function my_trial_active()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select trial_ends_at > now()
+     from companies
+     where id = my_company_id()),
+    true
+  );
+$$;
 ```
-Online:  Auth + drivers + tank_types + points → IDB write-through
-Offline: getSession + IDB driver/meta + cached tanks only → calc
-Save:    online insert | else outbox → flush on reconnect (after session refresh)
-```
 
-## Code verified (do not regress)
+Recreate `"dip_calculations insert own"` / `"update own"` with
+`and my_trial_active()`. Null `trial_ends_at` = active (matches middleware).
 
-- `app/calculator/CalculatorClient.tsx` mount: `getUser` → drivers → full
-  `tank_types` fetch — **all network today**; must become offline-aware (A1).
-- `app/calculator/TankSlot.tsx` `selectTank`: fetches points; **keep**
-  `selectedTankIdRef` + `isStaleTankPointsResponse` (safety-critical, `c6c012a`).
-- Trial gate `my_trial_ends_at` only in `lib/supabase/middleware.ts` — **does
-  not run** when SW serves cached shell offline → need client gate (A2).
-- Save: `toInsertPayload()` → `dip_calculations` insert — reuse as outbox body.
-- `app/calculator/page.tsx` `dynamic({ ssr: false })` is fine with Serwist.
+Expired-trial outbox flush → PostgREST RLS / `42501` → already poison-classified.
 
----
+## H2 — Server recompute (store-both)
 
-## Required amendments (A1–A5)
+Columns: `server_safe_fill_liters`, `server_before_volume_liters`,
+`server_after_volume_liters` (numeric null); `volume_mismatch boolean not null
+default false`; partial index where `volume_mismatch`.
 
-### A1 — BLOCKER: Offline boot sequence
+`recompute_dip_volumes()` BEFORE INSERT OR UPDATE:
+- Linear interpolate like `lib/dip-calculator/interpolate.ts` (exact / between /
+  OOR → that `server_*` null, no extrapolation).
+- `server_safe_fill_liters = capacity_liters * safe_fill_pct`.
+- Mismatch if present client value diverges > 0.5 L, or present dip is OOR;
+  include derived #3 / #6 / #7 when those sides are present.
+- Never RAISE.
 
-Cursor must **not** only offline-enable `selectTank`. Make
-`CalculatorClient` mount offline-aware:
+## H3 — User ops checklist
 
-1. **Session:** When offline (or network fails), use
-   `supabase.auth.getSession()` (local) instead of treating `getUser()` failure
-   as “logged out → `/login`”. When online, keep `getUser()` verification.
-2. **Driver/company:** After each successful online drivers lookup, cache
-   `{ driverId, companyId }` in IDB. When offline, read from IDB. If missing →
-   show “Connect once while online to use offline” (do not bounce to login if
-   session exists but cache empty — clear message).
-3. **Tank list:** Cache tank **metadata** (`id`, `chart_number`,
-   `manufacturer`, `capacity_liters`) in the charts store **with** points.
-   Offline picker lists **only cached tanks** (matches used-tanks-only).
-   `capacity_liters` is required for `calculateBeforeDelivery`.
+Supabase Dashboard → Authentication → Passwords → enable **Leaked password
+protection** (HaveIBeenPwned). Confirm in review; do not push `config.toml`.
 
-### A2 — Offline trial gate
+## H4 — Callback `next` allowlist
 
-- While online, fetch `trial_ends_at` once (e.g. `my_trial_ends_at` RPC) and
-  cache it in IDB with driver meta.
-- When offline, if `trial_ends_at <= now`, block calculator (same UX intent as
-  `/trial-ended`) and **do not accept new outbox saves**.
-- Rationale: middleware never runs on SW-served pages; RLS does not yet enforce
-  trial (Jul 26 audit). Without A2, expired trials get unlimited offline use
-  and queued saves would sync later.
-
-### A3 — Stale-response guard on IDB path
-
-Offline/async IDB chart reads in `selectTank` **must** still go through
-`selectedTankIdRef` + `isStaleTankPointsResponse` before applying points /
-clearing loading. Same wrong-ullage race as network.
-
-### A4 — Outbox poison-item handling
-
-On flush, distinguish failures:
-
-| Failure | Behavior |
-| --- | --- |
-| Network / timeout | Keep item; retry later |
-| Server rejection (RLS, validation, 4xx) | Mark **failed / dead-letter**, surface to driver, **do not** block the in-order queue behind it forever |
-
-Do **not** “keep + retry forever” for non-network errors.
-
-### A5 — Flush ordering with session refresh
-
-On reconnect / focus:
-
-1. Let supabase-js session refresh settle (or attempt insert; on **401**
-   refresh-and-retry **once**).
-2. Then flush outbox in order (skipping/marking poison items per A4).
-
-Drivers offline >1h often have an expired access token at flush time.
-
----
-
-## Implementation checklist
-
-1. **PWA shell** — Serwist, manifest, icons, register SW; precache app shell only.
-2. **`lib/offline/`** — IDB schema + helpers: charts (meta+points), drafts,
-   outbox, session/meta (`driverId`, `companyId`, `trialEndsAt`).
-3. **A1 boot** — rewrite CalculatorClient mount path as above.
-4. **A2** — cache + enforce `trialEndsAt` offline.
-5. **Chart load** — online: fetch + write-through; offline: IDB + A3 guard;
-   missing cache → “Open this tank once while online…”.
-6. **Drafts** — debounce save 4-slot state; restore on mount; clear on Save/Clear.
-7. **Outbox** — enqueue on network save failure; flush with A4 + A5; banner
-   “Offline / Online · N pending”.
-8. **Install hint** — short iOS Add to Home Screen / Android install affordance.
-9. **Docs** — design spec under `docs/superpowers/specs/`, update `CLAUDE.md`,
-   `README.md`, `SECURITY.md` when shipping.
+[`app/auth/callback/route.ts`](../app/auth/callback/route.ts): open redirect via
+`${origin}${next}` (e.g. `next=@evil.com`). Exact allowlist only.
 
 ## Out of scope
 
-- Stripe / paid unlock
-- Offline History
-- Prefetch entire chart catalog
-- Relying only on Background Sync API (use online/focus flush)
-- Changing `lib/dip-calculator/` math
-- Caching Supabase REST in the service worker
+Stripe / `subscription_active`, mismatch UI, dip-calculator edits, offline
+layer, `supabase config push`.
 
-## Verification (definition of done)
+## Apply migration
 
-**Unit**
+File: `supabase/migrations/20260729140000_security_hardenings.sql`.
+Must be applied to live project `oxxmcdtafnvnkbojnrgx` (`supabase db push` or
+MCP `apply_migration`).
 
-- IDB helpers; outbox enqueue / flush / poison-item; draft serialize/restore;
-  `isStaleTankPointsResponse` still covered.
+## Verification
 
-**Manual E2E**
-
-1. Sign in online → open a tank (caches meta+points) → airplane mode  
-2. Full before/after calc on **cached** tank → Save → queued  
-3. Un-cached tank → clear “open once online” error  
-4. Reconnect → flush → row in History  
-5. Swipe-up kill → reopen → all 4 slot drafts restored  
-6. Expired-trial account → gated offline (A2); no new outbox accepts  
-
-**Regression**
-
-- Existing unit suite green (currently 29+ tests; do not break dip-calculator
-  fixtures). No changes to `lib/dip-calculator/`.
-
-## Review gate after Cursor ships
-
-Re-review the diff against **A1–A5** (especially A1 boot path and A3 race
-guard) before calling Project 2 done.
+- Existing vitest green; H4 unit tests; no `lib/dip-calculator/` changes
+- SQL: expired-trial insert → RLS deny; normal save → mismatch false within
+  0.5 L of #014/#015/#526 fixtures; tampered insert → mismatch true; OOR dip →
+  saved, mismatch, null server volume
+- Callback `next=@evil.com` / `https://evil.com` → `/calculator`
+- H3 dashboard confirmation (user)

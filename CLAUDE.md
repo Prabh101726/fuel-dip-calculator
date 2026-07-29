@@ -36,13 +36,24 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
   ~4–6 days solid).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
-- Security hardenings from Jul 26 audit (not yet coded): enforce trial/paid in
-  RLS (not middleware-only), server-side recompute of chart volumes on save,
-  leaked-password protection, constrain `/auth/callback` `next` param.
+- **H3 ops (user):** Supabase Dashboard → Authentication → Passwords → enable
+  **Leaked password protection** (HaveIBeenPwned). Do not `supabase config push`.
 - Signature capture (image), history filtering, 12 flagged tanks in
   `review_needed.json`, Sentry — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
   (can clobber dashboard Auth URL / Confirm email settings).
+
+## Security hardenings (Jul 29 2026)
+
+Migration `20260729140000_security_hardenings.sql` applied live:
+- **H1:** `my_trial_active()` + insert/update RLS on `dip_calculations` (SELECT
+  ungated). Null `trial_ends_at` = active.
+- **H2:** store-both `server_*` columns + `volume_mismatch`; BEFORE INSERT OR
+  UPDATE trigger; never blocks saves. Spec:
+  `docs/superpowers/specs/2026-07-29-security-hardenings-design.md`.
+- **H4:** `/auth/callback` `next` allowlisted to `/calculator` | `/history`
+  via `lib/auth/safeNextPath.ts`.
+- **H3:** still manual dashboard toggle (see Still open).
 
 ## What's built (foundation phase)
 
