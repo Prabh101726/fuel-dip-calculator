@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   blankCalculatorDraft,
+  getCachedTank,
   getDraft,
   getOfflineDb,
+  getSessionMeta,
+  getTankCatalog,
   putCachedTank,
   putDraft,
   putSessionMeta,
-  getCachedTank,
-  getSessionMeta,
+  putTankCatalog,
   resetOfflineDbForTests,
 } from "./db";
 
@@ -16,6 +18,7 @@ describe("offline IDB helpers", () => {
     resetOfflineDbForTests();
     const db = await getOfflineDb();
     await db.clear("charts");
+    await db.clear("catalog");
     await db.clear("session");
     await db.clear("drafts");
     await db.clear("outbox");
@@ -58,5 +61,19 @@ describe("offline IDB helpers", () => {
     expect(restored?.slots[0].beforeDipCm).toBe("120");
     expect(restored?.slots[0].productGrade).toBe("E15 Reg");
     expect(restored?.slots).toHaveLength(4);
+  });
+
+  it("round-trips tank catalog metadata", async () => {
+    await putTankCatalog([
+      {
+        id: "t1",
+        chart_number: "015",
+        manufacturer: "ZCL",
+        capacity_liters: 50000,
+      },
+    ]);
+    const catalog = await getTankCatalog();
+    expect(catalog?.tanks).toHaveLength(1);
+    expect(catalog?.tanks[0].chart_number).toBe("015");
   });
 });

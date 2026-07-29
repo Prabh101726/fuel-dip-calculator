@@ -8,13 +8,17 @@ import {
   blankSlotDraft,
   getDraft,
   getSessionMeta,
+  getTankCatalog,
   isBrowserOnline,
   isTrialExpired,
   listCachedTanks,
   listOutbox,
   putDraft,
   putSessionMeta,
+  putTankCatalog,
+  type CalculatorDraft,
   type SlotDraft,
+  type TankCatalogEntry,
 } from "@/lib/offline/db";
 import { flushOutbox } from "@/lib/offline/flushOutbox";
 import { tankTabLabel } from "@/lib/product-grades";
@@ -155,145 +159,189 @@ export default function CalculatorClient() {
 
   useEffect(() => {
     let cancelled = false;
+
+    function applyDraft(draft: CalculatorDraft | undefined) {
+      if (draft?.slots?.length) {
+        const slots = Array.from({ length: SLOT_COUNT }, (_, i) =>
+          draft.slots[i] ?? blankSlotDraft(),
+        );
+        slotDraftsRef.current = slots;
+        const tab =
+          typeof draft.activeTab === "number" &&
+          draft.activeTab >= 0 &&
+          draft.activeTab < SLOT_COUNT
+            ? draft.activeTab
+            : 0;
+        setActiveTab(tab);
+        activeTabRef.current = tab;
+        setTabCharts(slots.map((s) => s.chartNumber));
+        setTabProducts(
+          slots.map((s) =>
+            s.productGrade.trim() === "" ? null : s.productGrade,
+          ),
+        );
+        draftsReadyRef.current = true;
+        setInitialSlotDrafts(slots);
+      } else {
+        draftsReadyRef.current = true;
+        setInitialSlotDrafts(
+          Array.from({ length: SLOT_COUNT }, () => blankSlotDraft()),
+        );
+      }
+    }
+
+    async function tanksForPaint(onlineNow: boolean): Promise<TankType[]> {
+      if (onlineNow) {
+        const catalog = await getTankCatalog();
+        if (catalog?.tanks.length) {
+          return catalog.tanks as TankType[];
+        }
+      }
+      const cached = await listCachedTanks();
+      return cached.map((c) => ({
+        id: c.tankTypeId,
+        chart_number: c.chart_number,
+        manufacturer: c.manufacturer,
+        capacity_liters: c.capacity_liters,
+      }));
+    }
+
+    /** Fast path: local session + IDB. Returns true if UI can paint (or trial blocked). */
+    async function paintFromCache(onlineNow: boolean): Promise<boolean> {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return false;
+
+      const meta = await getSessionMeta();
+      if (!meta) return false;
+
+      if (isTrialExpired(meta.trialEndsAt)) {
+        setTrialBlocked(true);
+        setBootDone(true);
+        return true;
+      }
+
+      setDriverId(meta.driverId);
+      setCompanyId(meta.companyId);
+      setTanks(await tanksForPaint(onlineNow));
+      applyDraft(await getDraft());
+      await refreshOutboxCounts();
+      setBootDone(true);
+      return true;
+    }
+
+    async function refreshOnline(options?: {
+      requireTanks?: boolean;
+    }): Promise<boolean> {
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
+      if (cancelled) return false;
+      if (userErr || !user) {
+        router.replace("/login");
+        return false;
+      }
+
+      const { data: driver, error: driverErr } = await supabase
+        .from("drivers")
+        .select("id, company_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return false;
+      if (driverErr || !driver) {
+        setLoadError(
+          "No driver account found. Ask your admin to provision access.",
+        );
+        return false;
+      }
+
+      const existingMeta = await getSessionMeta();
+      const { data: trialEndsAt, error: trialErr } =
+        await supabase.rpc("my_trial_ends_at");
+      const trial = trialErr
+        ? (existingMeta?.trialEndsAt ?? null)
+        : typeof trialEndsAt === "string"
+          ? trialEndsAt
+          : null;
+
+      await putSessionMeta({
+        driverId: driver.id,
+        companyId: driver.company_id,
+        trialEndsAt: trial,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (cancelled) return false;
+      if (isTrialExpired(trial)) {
+        setTrialBlocked(true);
+        return false;
+      }
+      setTrialBlocked(false);
+      setDriverId(driver.id);
+      setCompanyId(driver.company_id);
+
+      const { data: tankRows, error: tankErr } = await supabase
+        .from("tank_types")
+        .select("id, chart_number, manufacturer, capacity_liters")
+        .order("chart_number");
+
+      if (cancelled) return false;
+      if (tankErr) {
+        if (options?.requireTanks) {
+          setLoadError(tankErr.message);
+        }
+        return false;
+      }
+
+      const rows = (tankRows ?? []) as TankCatalogEntry[];
+      setTanks(rows as TankType[]);
+      await putTankCatalog(rows);
+      void runFlush();
+      return true;
+    }
+
     (async () => {
       const currentlyOnline = isBrowserOnline();
       setOnline(currentlyOnline);
 
       try {
-        if (currentlyOnline) {
-          const {
-            data: { user },
-            error: userErr,
-          } = await supabase.auth.getUser();
-          if (cancelled) return;
-          if (userErr || !user) {
-            router.replace("/login");
-            return;
+        const painted = await paintFromCache(currentlyOnline);
+        if (cancelled) return;
+
+        if (painted) {
+          // Warm reopen: form already visible; refresh in background when online.
+          if (currentlyOnline) {
+            void refreshOnline().catch(() => {
+              /* keep cached UI */
+            });
           }
+          return;
+        }
 
-          const { data: driver, error: driverErr } = await supabase
-            .from("drivers")
-            .select("id, company_id")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          if (cancelled) return;
-          if (driverErr || !driver) {
-            setLoadError(
-              "No driver account found. Ask your admin to provision access.",
-            );
-            setBootDone(true);
-            return;
-          }
-
-          const existingMeta = await getSessionMeta();
-          const { data: trialEndsAt, error: trialErr } =
-            await supabase.rpc("my_trial_ends_at");
-          // Only overwrite cached trial on RPC success — a transient failure
-          // must not clear trialEndsAt and un-gate offline use.
-          const trial = trialErr
-            ? (existingMeta?.trialEndsAt ?? null)
-            : typeof trialEndsAt === "string"
-              ? trialEndsAt
-              : null;
-
-          await putSessionMeta({
-            driverId: driver.id,
-            companyId: driver.company_id,
-            trialEndsAt: trial,
-            updatedAt: new Date().toISOString(),
-          });
-
-          if (isTrialExpired(trial)) {
-            setTrialBlocked(true);
-            setBootDone(true);
-            return;
-          }
-
-          setDriverId(driver.id);
-          setCompanyId(driver.company_id);
-
-          const { data: tankRows, error: tankErr } = await supabase
-            .from("tank_types")
-            .select("id, chart_number, manufacturer, capacity_liters")
-            .order("chart_number");
-
-          if (cancelled) return;
-          if (tankErr) {
-            setLoadError(tankErr.message);
-            setBootDone(true);
-            return;
-          }
-          setTanks((tankRows ?? []) as TankType[]);
-        } else {
+        // Cold first visit (no IDB session yet)
+        if (!currentlyOnline) {
           const {
             data: { session },
           } = await supabase.auth.getSession();
-          if (cancelled) return;
           if (!session) {
             router.replace("/login");
             return;
           }
-
-          const meta = await getSessionMeta();
-          if (!meta) {
-            setLoadError(
-              "Connect once while online to use the calculator offline.",
-            );
-            setBootDone(true);
-            return;
-          }
-          if (isTrialExpired(meta.trialEndsAt)) {
-            setTrialBlocked(true);
-            setBootDone(true);
-            return;
-          }
-
-          setDriverId(meta.driverId);
-          setCompanyId(meta.companyId);
-          const cached = await listCachedTanks();
-          setTanks(
-            cached.map((c) => ({
-              id: c.tankTypeId,
-              chart_number: c.chart_number,
-              manufacturer: c.manufacturer,
-              capacity_liters: c.capacity_liters,
-            })),
+          setLoadError(
+            "Connect once while online to use the calculator offline.",
           );
+          setBootDone(true);
+          return;
         }
 
-        const draft = await getDraft();
+        await refreshOnline({ requireTanks: true });
         if (cancelled) return;
-        if (draft?.slots?.length) {
-          const slots = Array.from({ length: SLOT_COUNT }, (_, i) =>
-            draft.slots[i] ?? blankSlotDraft(),
-          );
-          slotDraftsRef.current = slots;
-          const tab =
-            typeof draft.activeTab === "number" &&
-            draft.activeTab >= 0 &&
-            draft.activeTab < SLOT_COUNT
-              ? draft.activeTab
-              : 0;
-          setActiveTab(tab);
-          activeTabRef.current = tab;
-          setTabCharts(slots.map((s) => s.chartNumber));
-          setTabProducts(
-            slots.map((s) => (s.productGrade.trim() === "" ? null : s.productGrade)),
-          );
-          draftsReadyRef.current = true;
-          setInitialSlotDrafts(slots);
-        } else {
-          draftsReadyRef.current = true;
-          setInitialSlotDrafts(
-            Array.from({ length: SLOT_COUNT }, () => blankSlotDraft()),
-          );
-        }
-
+        applyDraft(await getDraft());
         await refreshOutboxCounts();
-        if (currentlyOnline) {
-          void runFlush();
-        }
+        setBootDone(true);
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -304,10 +352,10 @@ export default function CalculatorClient() {
         } else {
           setLoadError(msg || "Failed to load calculator.");
         }
-      } finally {
-        if (!cancelled) setBootDone(true);
+        setBootDone(true);
       }
     })();
+
     return () => {
       cancelled = true;
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);

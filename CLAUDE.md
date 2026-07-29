@@ -210,12 +210,14 @@ Spec: `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`
 Serwist service worker caches the app shell only (never Supabase API).
 IndexedDB (`lib/offline/`) holds used-tank charts (meta + points), session
 meta (`driverId` / `companyId` / `trialEndsAt`), 4-slot drafts, and a save
-outbox. Offline boot uses local `getSession` + IDB (A1); expired trials are
-gated client-side (A2); chart loads keep the stale-response guard (A3);
-outbox flush poisons non-network failures (A4) and refreshes session once on
-401 (A5). History remains online-only. Spec:
-`docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Local PWA test:
-`npm run build && npm start` (or `npm run dev:pwa`).
+  outbox. Offline boot uses local `getSession` + IDB (A1); expired trials are
+  gated client-side (A2); chart loads keep the stale-response guard (A3);
+  outbox flush poisons non-network failures (A4) and refreshes session once on
+  401 (A5). Calculator **paints from IDB first** on reopen (session + tank
+  catalog + drafts), then refreshes online in the background. History remains
+  online-only. Spec:
+  `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Local PWA test:
+  `npm run build && npm start` (or `npm run dev:pwa`).
 
 Review-hardened in `6e7f643` — three constraints from that fix round are
 load-bearing:

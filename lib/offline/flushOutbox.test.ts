@@ -21,6 +21,9 @@ describe("flushOutbox", () => {
     // Use a unique DB name would be better; delete all stores via open
     const db = await getOfflineDb();
     await db.clear("outbox");
+    if (db.objectStoreNames.contains("catalog")) {
+      await db.clear("catalog");
+    }
   });
 
   it("deletes items that insert successfully", async () => {

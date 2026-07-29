@@ -3,7 +3,7 @@ import type { DipChartPoint } from "@/lib/dip-calculator/types";
 import type { SafeFillPct } from "@/lib/dip-calculations/toInsertPayload";
 
 const DB_NAME = "fuel-dip-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export type CachedTankChart = {
   tankTypeId: string;
@@ -12,6 +12,20 @@ export type CachedTankChart = {
   capacity_liters: number;
   points: DipChartPoint[];
   cachedAt: string;
+};
+
+/** Full tank_types metadata for fast online reopen (no dip points). */
+export type TankCatalogEntry = {
+  id: string;
+  chart_number: string;
+  manufacturer: string;
+  capacity_liters: number;
+};
+
+export type TankCatalog = {
+  id: "current";
+  tanks: TankCatalogEntry[];
+  updatedAt: string;
 };
 
 export type OfflineSessionMeta = {
@@ -59,6 +73,10 @@ interface FuelDipOfflineDb extends DBSchema {
     key: string;
     value: CachedTankChart;
   };
+  catalog: {
+    key: string;
+    value: TankCatalog;
+  };
   session: {
     key: string;
     value: OfflineSessionMeta;
@@ -79,12 +97,17 @@ let dbPromise: Promise<IDBPDatabase<FuelDipOfflineDb>> | null = null;
 export function getOfflineDb() {
   if (!dbPromise) {
     dbPromise = openDB<FuelDipOfflineDb>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        db.createObjectStore("charts", { keyPath: "tankTypeId" });
-        db.createObjectStore("session", { keyPath: "id" });
-        db.createObjectStore("drafts", { keyPath: "id" });
-        const outbox = db.createObjectStore("outbox", { keyPath: "id" });
-        outbox.createIndex("by-created", "createdAt");
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore("charts", { keyPath: "tankTypeId" });
+          db.createObjectStore("session", { keyPath: "id" });
+          db.createObjectStore("drafts", { keyPath: "id" });
+          const outbox = db.createObjectStore("outbox", { keyPath: "id" });
+          outbox.createIndex("by-created", "createdAt");
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore("catalog", { keyPath: "id" });
+        }
       },
     });
   }
@@ -116,6 +139,20 @@ export async function getCachedTank(
 export async function listCachedTanks(): Promise<CachedTankChart[]> {
   const db = await getOfflineDb();
   return db.getAll("charts");
+}
+
+export async function putTankCatalog(tanks: TankCatalogEntry[]): Promise<void> {
+  const db = await getOfflineDb();
+  await db.put("catalog", {
+    id: "current",
+    tanks,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function getTankCatalog(): Promise<TankCatalog | undefined> {
+  const db = await getOfflineDb();
+  return db.get("catalog", "current");
 }
 
 export async function putSessionMeta(
