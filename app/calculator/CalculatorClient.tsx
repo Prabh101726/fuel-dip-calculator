@@ -94,9 +94,15 @@ export default function CalculatorClient() {
     setFailedCount(items.filter((i) => i.status === "failed").length);
   }, []);
 
+  // Until boot restores IDB drafts into slotDraftsRef, persisting would
+  // clobber real drafts with blanks (online boot often >400ms).
+  const draftsReadyRef = useRef(false);
+
   const scheduleDraftPersist = useCallback(() => {
+    if (!draftsReadyRef.current) return;
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     draftTimerRef.current = setTimeout(() => {
+      if (!draftsReadyRef.current) return;
       void putDraft({
         activeTab: activeTabRef.current,
         slots: slotDraftsRef.current,
@@ -180,9 +186,16 @@ export default function CalculatorClient() {
             return;
           }
 
-          const { data: trialEndsAt } = await supabase.rpc("my_trial_ends_at");
-          const trial =
-            typeof trialEndsAt === "string" ? trialEndsAt : null;
+          const existingMeta = await getSessionMeta();
+          const { data: trialEndsAt, error: trialErr } =
+            await supabase.rpc("my_trial_ends_at");
+          // Only overwrite cached trial on RPC success — a transient failure
+          // must not clear trialEndsAt and un-gate offline use.
+          const trial = trialErr
+            ? (existingMeta?.trialEndsAt ?? null)
+            : typeof trialEndsAt === "string"
+              ? trialEndsAt
+              : null;
 
           await putSessionMeta({
             driverId: driver.id,
@@ -256,7 +269,6 @@ export default function CalculatorClient() {
             draft.slots[i] ?? blankSlotDraft(),
           );
           slotDraftsRef.current = slots;
-          setInitialSlotDrafts(slots);
           const tab =
             typeof draft.activeTab === "number" &&
             draft.activeTab >= 0 &&
@@ -269,7 +281,10 @@ export default function CalculatorClient() {
           setTabProducts(
             slots.map((s) => (s.productGrade.trim() === "" ? null : s.productGrade)),
           );
+          draftsReadyRef.current = true;
+          setInitialSlotDrafts(slots);
         } else {
+          draftsReadyRef.current = true;
           setInitialSlotDrafts(
             Array.from({ length: SLOT_COUNT }, () => blankSlotDraft()),
           );

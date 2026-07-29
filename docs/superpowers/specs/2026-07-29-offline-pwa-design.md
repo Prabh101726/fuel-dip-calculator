@@ -29,9 +29,14 @@ Offline: getSession (local) + IDB session (+ trial gate)
   `/calculator` + `/~offline`. Runtime: `defaultCache` plus **NetworkOnly** for
   Supabase hosts — never cache API responses in the SW.
 - **IndexedDB (`idb`):** stores `charts`, `session`, `drafts`, `outbox`.
-- **Drafts:** debounced 4-slot autosave; restore on calculator mount.
+- **Drafts:** debounced 4-slot autosave **after** boot restore completes
+  (`draftsReadyRef`); restore on calculator mount. Persist must not arm during
+  the online boot network round-trips or blanks clobber IDB.
 - **Outbox:** ordered flush; network keeps pending; 4xx/validation → `failed`
-  (poison); 401 → refresh once and retry.
+  (poison); 401 → refresh once and retry. Classifier uses Postgrest `message` /
+  `code` (not HTTP status — postgrest-js does not expose status on errors).
+- **Precache:** `/~offline` only — do **not** precache `/calculator` (auth
+  redirect can poison the cache key with login HTML).
 
 ## Required amendments (A1–A5)
 

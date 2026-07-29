@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   deleteOutboxItem,
-  isAuthErrorStatus,
-  isClientRejectStatus,
   isNetworkLikeError,
   listOutbox,
   markOutboxFailed,
@@ -88,23 +86,30 @@ async function tryInsert(
   try {
     const { error } = await supabase.from("dip_calculations").insert(item.payload);
     if (!error) return "ok";
-    const status = (error as { status?: number }).status;
+    // PostgrestError exposes `code` / `message`, not an HTTP status field —
+    // classify on message (and optional code). Default reject so the queue
+    // cannot wedge on unknown server errors.
+    const code = (error as { code?: string }).code ?? "";
     const message = error.message || "Save failed";
-    if (isAuthErrorStatus(status) || /JWT|session|auth/i.test(message)) {
+    if (
+      /JWT|session|auth|expired/i.test(message) ||
+      code === "PGRST301"
+    ) {
       return { kind: "auth", message };
     }
     if (
-      isClientRejectStatus(status) ||
       /row-level security|violates|check constraint|duplicate|invalid/i.test(
         message,
-      )
+      ) ||
+      code === "42501" ||
+      code === "23514" ||
+      code === "23505"
     ) {
       return { kind: "reject", message };
     }
     if (isNetworkLikeError(error) || /network|fetch/i.test(message)) {
       return { kind: "network", message };
     }
-    // Default non-network API errors as poison so the queue cannot wedge
     return { kind: "reject", message };
   } catch (err) {
     if (isNetworkLikeError(err)) {

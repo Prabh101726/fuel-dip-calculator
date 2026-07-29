@@ -12,10 +12,10 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
   reloadOnOnline: false,
   register: true,
-  additionalPrecacheEntries: [
-    { url: "/~offline", revision },
-    { url: "/calculator", revision },
-  ],
+  // Do not precache /calculator — middleware auth-gates it, so a first-visit
+  // precache from /login can store login HTML under the /calculator key.
+  // Runtime document caching covers the shell after the required online sign-in.
+  additionalPrecacheEntries: [{ url: "/~offline", revision }],
 });
 
 const nextConfig: NextConfig = {};
