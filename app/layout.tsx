@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,19 @@ export const metadata: Metadata = {
   title: "Fuel Dip Calculator",
   description:
     "Safe discharge sheet for fuel delivery — dip chart volumes, ullage, and reconciliation.",
+  applicationName: "Fuel Dip Calculator",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Fuel Dip",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#12141a",
 };
 
 export default function RootLayout({

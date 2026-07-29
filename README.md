@@ -19,15 +19,17 @@ Built under **SRV Freight Inc** / **Detours Fleet Operations**, separate from
 - Forgot password / reset
 - 7-day trial (new accounts); planned paid plan **$2.99/month** (copy only — Stripe not shipped yet)
 - 4-tab multi-tank calculator
+- **Installable PWA** — used-tank chart cache, draft restore after swipe-up, offline save queue (History still needs network)
 - History, Privacy, Terms, safety reminders
 
-**Not yet:** Stripe Checkout, PWA/offline, signature capture (image), history filters.
+**Not yet:** Stripe Checkout, signature capture (image), history filters.
 
 ## Stack
 
 - [Next.js](https://nextjs.org) (TypeScript, App Router)
 - [Supabase](https://supabase.com) (Postgres, Auth, RLS)
 - [Vercel](https://vercel.com)
+- [Serwist](https://serwist.pages.dev) (service worker) + IndexedDB (`idb`)
 - GitHub Actions CI (lint, type-check, unit tests, build)
 
 ## Local setup
@@ -51,6 +53,13 @@ Built under **SRV Freight Inc** / **Detours Fleet Operations**, separate from
    npm run dev
    ```
 
+   For local service-worker testing (Serwist is disabled in plain `next dev`):
+
+   ```bash
+   npm run build && npm start
+   # or: npm run dev:pwa
+   ```
+
 4. Checks used by CI:
 
    ```bash
@@ -66,6 +75,7 @@ Built under **SRV Freight Inc** / **Detours Fleet Operations**, separate from
 | [`docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`](docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md) | Original v1 design (auth has since diverged) |
 | [`docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`](docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md) | Pre-production readiness spec |
 | [`docs/superpowers/plans/2026-07-26-pre-production-readiness.md`](docs/superpowers/plans/2026-07-26-pre-production-readiness.md) | Pre-production implementation plan |
+| [`docs/superpowers/specs/2026-07-29-offline-pwa-design.md`](docs/superpowers/specs/2026-07-29-offline-pwa-design.md) | Offline PWA (Project 2) |
 
 ## Safety note
 

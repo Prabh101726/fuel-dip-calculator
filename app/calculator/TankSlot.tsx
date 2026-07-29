@@ -16,6 +16,17 @@ import {
   type SafeFillPct,
 } from "@/lib/dip-calculations/toInsertPayload";
 import { formatLiters, formatSignedLiters } from "@/lib/format-liters";
+import {
+  blankSlotDraft,
+  enqueueOutbox,
+  getCachedTank,
+  getSessionMeta,
+  isBrowserOnline,
+  isNetworkLikeError,
+  isTrialExpired,
+  putCachedTank,
+  type SlotDraft,
+} from "@/lib/offline/db";
 import { PRODUCT_GRADES } from "@/lib/product-grades";
 
 export type TankType = {
@@ -30,6 +41,9 @@ type Props = {
   driverId: string;
   companyId: string;
   supabase: SupabaseClient;
+  initialDraft?: SlotDraft | null;
+  onDraftChange?: (draft: SlotDraft) => void;
+  onOutboxChange?: () => void;
   onSelectedChartChange: (chartNumber: string | null) => void;
   onSelectedProductChange: (productGrade: string | null) => void;
 };
@@ -98,9 +112,13 @@ export default function TankSlot({
   driverId,
   companyId,
   supabase,
+  initialDraft,
+  onDraftChange,
+  onOutboxChange,
   onSelectedChartChange,
   onSelectedProductChange,
 }: Props) {
+  const seed = initialDraft ?? blankSlotDraft();
   const [tankQuery, setTankQuery] = useState("");
   const [selectedTank, setSelectedTank] = useState<TankType | null>(null);
   const [tankPoints, setTankPoints] = useState<DipChartPoint[]>([]);
@@ -108,27 +126,44 @@ export default function TankSlot({
   const [pointsError, setPointsError] = useState("");
   /** Latest selected tank id — used to drop stale dip-chart fetch results. */
   const selectedTankIdRef = useRef<string | null>(null);
+  const tankRestoredRef = useRef(false);
 
-  const [safeFillPct, setSafeFillPct] = useState<SafeFillPct>(0.9);
-  const [locationLabel, setLocationLabel] = useState("");
-  const [productGrade, setProductGrade] = useState("");
-  const [beforeDipCm, setBeforeDipCm] = useState("");
-  const [plannedDeliveryLiters, setPlannedDeliveryLiters] = useState("");
-  const [afterDipCm, setAfterDipCm] = useState("");
-  const [divertedTo, setDivertedTo] = useState("");
-  const [newBolNo, setNewBolNo] = useState("");
-  const [litersRetained, setLitersRetained] = useState("");
-  const [driverSignature, setDriverSignature] = useState("");
+  const [safeFillPct, setSafeFillPct] = useState<SafeFillPct>(
+    seed.safeFillPct === 0.95 ? 0.95 : 0.9,
+  );
+  const [locationLabel, setLocationLabel] = useState(seed.locationLabel);
+  const [productGrade, setProductGrade] = useState(seed.productGrade);
+  const [beforeDipCm, setBeforeDipCm] = useState(seed.beforeDipCm);
+  const [plannedDeliveryLiters, setPlannedDeliveryLiters] = useState(
+    seed.plannedDeliveryLiters,
+  );
+  const [afterDipCm, setAfterDipCm] = useState(seed.afterDipCm);
+  const [divertedTo, setDivertedTo] = useState(seed.divertedTo);
+  const [newBolNo, setNewBolNo] = useState(seed.newBolNo);
+  const [litersRetained, setLitersRetained] = useState(seed.litersRetained);
+  const [driverSignature, setDriverSignature] = useState(seed.driverSignature);
 
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [queuedFlash, setQueuedFlash] = useState(false);
 
   useEffect(() => {
-    if (!savedFlash) return;
-    const t = setTimeout(() => setSavedFlash(false), 2500);
+    if (!savedFlash && !queuedFlash) return;
+    const t = setTimeout(() => {
+      setSavedFlash(false);
+      setQueuedFlash(false);
+    }, 2500);
     return () => clearTimeout(t);
-  }, [savedFlash]);
+  }, [savedFlash, queuedFlash]);
+
+  // Sync tab product label once from restored draft.
+  useEffect(() => {
+    if (seed.productGrade.trim() !== "") {
+      onSelectedProductChange(seed.productGrade);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function resetSlot() {
     selectedTankIdRef.current = null;
@@ -151,6 +186,7 @@ export default function TankSlot({
     setSaving(false);
     onSelectedChartChange(null);
     onSelectedProductChange(null);
+    onDraftChange?.(blankSlotDraft());
   }
 
   async function selectTank(tank: TankType) {
@@ -161,28 +197,152 @@ export default function TankSlot({
     setTankPoints([]);
     setPointsError("");
     setPointsLoading(true);
-    const { data, error } = await supabase
-      .from("dip_chart_points")
-      .select("dip_cm, volume_liters")
-      .eq("tank_type_id", tank.id)
-      .order("dip_cm");
-    // Another tank (or clear) won the race — do not touch loading/points state.
-    if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
-      return;
-    }
-    setPointsLoading(false);
-    if (error) {
-      setPointsError(error.message);
-      setTankPoints([]);
-      return;
-    }
-    setTankPoints(
-      (data ?? []).map((r) => ({
+
+    try {
+      if (!isBrowserOnline()) {
+        const cached = await getCachedTank(tank.id);
+        if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
+          return;
+        }
+        setPointsLoading(false);
+        if (!cached || cached.points.length === 0) {
+          setPointsError(
+            "Open this tank once while online to use it offline.",
+          );
+          setTankPoints([]);
+          return;
+        }
+        setTankPoints(cached.points);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("dip_chart_points")
+        .select("dip_cm, volume_liters")
+        .eq("tank_type_id", tank.id)
+        .order("dip_cm");
+      // Another tank (or clear) won the race — do not touch loading/points state.
+      if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
+        return;
+      }
+      setPointsLoading(false);
+      if (error) {
+        // Fallback to IDB if network fetch failed mid-session
+        const cached = await getCachedTank(tank.id);
+        if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
+          return;
+        }
+        if (cached && cached.points.length > 0) {
+          setTankPoints(cached.points);
+          setPointsError("");
+          return;
+        }
+        setPointsError(error.message);
+        setTankPoints([]);
+        return;
+      }
+      const points = (data ?? []).map((r) => ({
         dipCm: Number(r.dip_cm),
         volumeLiters: Number(r.volume_liters),
-      })),
-    );
+      }));
+      setTankPoints(points);
+      await putCachedTank({
+        tankTypeId: tank.id,
+        chart_number: tank.chart_number,
+        manufacturer: tank.manufacturer,
+        capacity_liters: Number(tank.capacity_liters),
+        points,
+        cachedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
+        return;
+      }
+      setPointsLoading(false);
+      const cached = await getCachedTank(tank.id);
+      if (isStaleTankPointsResponse(tank.id, selectedTankIdRef.current)) {
+        return;
+      }
+      if (cached && cached.points.length > 0) {
+        setTankPoints(cached.points);
+        setPointsError("");
+        return;
+      }
+      setPointsError(
+        err instanceof Error
+          ? err.message
+          : "Could not load dip chart points.",
+      );
+      setTankPoints([]);
+    }
   }
+
+  // Restore selected tank + points from draft (async IDB / network).
+  useEffect(() => {
+    if (tankRestoredRef.current) return;
+    const tankTypeId = seed.tankTypeId;
+    if (!tankTypeId) {
+      tankRestoredRef.current = true;
+      return;
+    }
+    tankRestoredRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      const fromList = tanks.find((t) => t.id === tankTypeId);
+      const tank =
+        fromList ??
+        (await getCachedTank(tankTypeId).then((cached) =>
+          cached
+            ? {
+                id: cached.tankTypeId,
+                chart_number: cached.chart_number,
+                manufacturer: cached.manufacturer,
+                capacity_liters: cached.capacity_liters,
+              }
+            : null,
+        ));
+      if (cancelled || !tank) return;
+      await selectTank(tank);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // intentionally once when tanks first available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tanks]);
+
+  useEffect(() => {
+    if (!onDraftChange) return;
+    onDraftChange({
+      tankTypeId: selectedTank?.id ?? seed.tankTypeId,
+      chartNumber: selectedTank?.chart_number ?? seed.chartNumber,
+      productGrade,
+      safeFillPct,
+      locationLabel,
+      beforeDipCm,
+      plannedDeliveryLiters,
+      afterDipCm,
+      divertedTo,
+      newBolNo,
+      litersRetained,
+      driverSignature,
+    });
+  }, [
+    seed.tankTypeId,
+    seed.chartNumber,
+    selectedTank,
+    productGrade,
+    safeFillPct,
+    locationLabel,
+    beforeDipCm,
+    plannedDeliveryLiters,
+    afterDipCm,
+    divertedTo,
+    newBolNo,
+    litersRetained,
+    driverSignature,
+    onDraftChange,
+  ]);
 
   function clearSelectedTankOnly() {
     selectedTankIdRef.current = null;
@@ -290,6 +450,12 @@ export default function TankSlot({
       return;
     }
 
+    const meta = await getSessionMeta();
+    if (isTrialExpired(meta?.trialEndsAt)) {
+      setSaveError("Trial ended — connect online to renew. Offline saves are blocked.");
+      return;
+    }
+
     setSaving(true);
     const payload = toInsertPayload({
       companyId,
@@ -317,14 +483,47 @@ export default function TankSlot({
       driverSignature: sig,
     });
 
-    const { error } = await supabase.from("dip_calculations").insert(payload);
-    setSaving(false);
-    if (error) {
-      setSaveError(error.message || "Save failed.");
+    const queueOffline = async (reason?: string) => {
+      await enqueueOutbox(payload as unknown as Record<string, unknown>);
+      onOutboxChange?.();
+      setSaving(false);
+      resetSlot();
+      setQueuedFlash(true);
+      if (reason) {
+        // queued successfully; reason is informational only
+      }
+    };
+
+    if (!isBrowserOnline()) {
+      await queueOffline();
       return;
     }
-    resetSlot();
-    setSavedFlash(true);
+
+    try {
+      const { error } = await supabase.from("dip_calculations").insert(payload);
+      if (error) {
+        if (
+          isNetworkLikeError(error) ||
+          /network|fetch|Failed to fetch/i.test(error.message)
+        ) {
+          await queueOffline(error.message);
+          return;
+        }
+        setSaving(false);
+        setSaveError(error.message || "Save failed.");
+        return;
+      }
+      setSaving(false);
+      resetSlot();
+      setSavedFlash(true);
+    } catch (err) {
+      if (isNetworkLikeError(err)) {
+        await queueOffline(err instanceof Error ? err.message : String(err));
+        return;
+      }
+      setSaving(false);
+      setSaveError(err instanceof Error ? err.message : "Save failed.");
+    }
   }
 
   return (
@@ -335,6 +534,14 @@ export default function TankSlot({
           role="status"
         >
           Saved ✓
+        </p>
+      )}
+      {queuedFlash && (
+        <p
+          className="mb-3 rounded-lg border border-[var(--warn)] bg-[var(--warn-bg)] px-3 py-2 text-sm font-bold text-[var(--warn-fg)]"
+          role="status"
+        >
+          Queued for sync ✓
         </p>
       )}
 

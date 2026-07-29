@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:pwa": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -13,17 +14,21 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
+    "idb": "^8.0.3",
     "next": "16.2.11",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@serwist/next": "^9.5.12",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
+    "fake-indexeddb": "^6.2.5",
+    "serwist": "^9.5.12",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

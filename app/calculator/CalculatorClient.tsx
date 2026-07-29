@@ -2,13 +2,29 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAFETY_REMINDER } from "@/lib/app-copy";
+import {
+  blankSlotDraft,
+  getDraft,
+  getSessionMeta,
+  isBrowserOnline,
+  isTrialExpired,
+  listCachedTanks,
+  listOutbox,
+  putDraft,
+  putSessionMeta,
+  type SlotDraft,
+} from "@/lib/offline/db";
+import { flushOutbox } from "@/lib/offline/flushOutbox";
 import { tankTabLabel } from "@/lib/product-grades";
 import { createClient } from "@/lib/supabase/client";
+import InstallHint from "./InstallHint";
+import OfflineBanner from "./OfflineBanner";
 import TankSlot, { type TankType } from "./TankSlot";
 
 const SLOT_COUNT = 4;
+const DRAFT_DEBOUNCE_MS = 400;
 
 export default function CalculatorClient() {
   const router = useRouter();
@@ -18,6 +34,12 @@ export default function CalculatorClient() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [tanks, setTanks] = useState<TankType[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [trialBlocked, setTrialBlocked] = useState(false);
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const [pendingCount, setPendingCount] = useState(0);
+  const [failedCount, setFailedCount] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
   const [tabCharts, setTabCharts] = useState<(string | null)[]>(() =>
     Array.from({ length: SLOT_COUNT }, () => null),
@@ -25,6 +47,16 @@ export default function CalculatorClient() {
   const [tabProducts, setTabProducts] = useState<(string | null)[]>(() =>
     Array.from({ length: SLOT_COUNT }, () => null),
   );
+  const [initialSlotDrafts, setInitialSlotDrafts] = useState<
+    (SlotDraft | null)[] | null
+  >(null);
+  const [bootDone, setBootDone] = useState(false);
+
+  const slotDraftsRef = useRef<SlotDraft[]>(
+    Array.from({ length: SLOT_COUNT }, () => blankSlotDraft()),
+  );
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeTabRef = useRef(0);
 
   const chartSetters = useMemo(
     () =>
@@ -56,54 +88,239 @@ export default function CalculatorClient() {
     [],
   );
 
+  const refreshOutboxCounts = useCallback(async () => {
+    const items = await listOutbox();
+    setPendingCount(items.filter((i) => i.status === "pending").length);
+    setFailedCount(items.filter((i) => i.status === "failed").length);
+  }, []);
+
+  const scheduleDraftPersist = useCallback(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      void putDraft({
+        activeTab: activeTabRef.current,
+        slots: slotDraftsRef.current,
+        updatedAt: new Date().toISOString(),
+      });
+    }, DRAFT_DEBOUNCE_MS);
+  }, []);
+
+  const onSlotDraftChange = useCallback(
+    (index: number, draft: SlotDraft) => {
+      slotDraftsRef.current[index] = draft;
+      scheduleDraftPersist();
+    },
+    [scheduleDraftPersist],
+  );
+
+  const runFlush = useCallback(async () => {
+    if (!isBrowserOnline()) return;
+    await flushOutbox(supabase, {
+      refreshSession: async () => {
+        await supabase.auth.refreshSession();
+      },
+    });
+    await refreshOutboxCounts();
+  }, [supabase, refreshOutboxCounts]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    scheduleDraftPersist();
+  }, [activeTab, scheduleDraftPersist]);
+
+  useEffect(() => {
+    const onOnline = () => {
+      setOnline(true);
+      void runFlush();
+    };
+    const onOffline = () => setOnline(false);
+    const onFocus = () => {
+      if (isBrowserOnline()) void runFlush();
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [runFlush]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace("/login");
-        return;
+      const currentlyOnline = isBrowserOnline();
+      setOnline(currentlyOnline);
+
+      try {
+        if (currentlyOnline) {
+          const {
+            data: { user },
+            error: userErr,
+          } = await supabase.auth.getUser();
+          if (cancelled) return;
+          if (userErr || !user) {
+            router.replace("/login");
+            return;
+          }
+
+          const { data: driver, error: driverErr } = await supabase
+            .from("drivers")
+            .select("id, company_id")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (cancelled) return;
+          if (driverErr || !driver) {
+            setLoadError(
+              "No driver account found. Ask your admin to provision access.",
+            );
+            setBootDone(true);
+            return;
+          }
+
+          const { data: trialEndsAt } = await supabase.rpc("my_trial_ends_at");
+          const trial =
+            typeof trialEndsAt === "string" ? trialEndsAt : null;
+
+          await putSessionMeta({
+            driverId: driver.id,
+            companyId: driver.company_id,
+            trialEndsAt: trial,
+            updatedAt: new Date().toISOString(),
+          });
+
+          if (isTrialExpired(trial)) {
+            setTrialBlocked(true);
+            setBootDone(true);
+            return;
+          }
+
+          setDriverId(driver.id);
+          setCompanyId(driver.company_id);
+
+          const { data: tankRows, error: tankErr } = await supabase
+            .from("tank_types")
+            .select("id, chart_number, manufacturer, capacity_liters")
+            .order("chart_number");
+
+          if (cancelled) return;
+          if (tankErr) {
+            setLoadError(tankErr.message);
+            setBootDone(true);
+            return;
+          }
+          setTanks((tankRows ?? []) as TankType[]);
+        } else {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (cancelled) return;
+          if (!session) {
+            router.replace("/login");
+            return;
+          }
+
+          const meta = await getSessionMeta();
+          if (!meta) {
+            setLoadError(
+              "Connect once while online to use the calculator offline.",
+            );
+            setBootDone(true);
+            return;
+          }
+          if (isTrialExpired(meta.trialEndsAt)) {
+            setTrialBlocked(true);
+            setBootDone(true);
+            return;
+          }
+
+          setDriverId(meta.driverId);
+          setCompanyId(meta.companyId);
+          const cached = await listCachedTanks();
+          setTanks(
+            cached.map((c) => ({
+              id: c.tankTypeId,
+              chart_number: c.chart_number,
+              manufacturer: c.manufacturer,
+              capacity_liters: c.capacity_liters,
+            })),
+          );
+        }
+
+        const draft = await getDraft();
+        if (cancelled) return;
+        if (draft?.slots?.length) {
+          const slots = Array.from({ length: SLOT_COUNT }, (_, i) =>
+            draft.slots[i] ?? blankSlotDraft(),
+          );
+          slotDraftsRef.current = slots;
+          setInitialSlotDrafts(slots);
+          const tab =
+            typeof draft.activeTab === "number" &&
+            draft.activeTab >= 0 &&
+            draft.activeTab < SLOT_COUNT
+              ? draft.activeTab
+              : 0;
+          setActiveTab(tab);
+          activeTabRef.current = tab;
+          setTabCharts(slots.map((s) => s.chartNumber));
+          setTabProducts(
+            slots.map((s) => (s.productGrade.trim() === "" ? null : s.productGrade)),
+          );
+        } else {
+          setInitialSlotDrafts(
+            Array.from({ length: SLOT_COUNT }, () => blankSlotDraft()),
+          );
+        }
+
+        await refreshOutboxCounts();
+        if (currentlyOnline) {
+          void runFlush();
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!currentlyOnline) {
+          setLoadError(
+            "Could not start offline. Connect once while online, then try again.",
+          );
+        } else {
+          setLoadError(msg || "Failed to load calculator.");
+        }
+      } finally {
+        if (!cancelled) setBootDone(true);
       }
-
-      const { data: driver, error: driverErr } = await supabase
-        .from("drivers")
-        .select("id, company_id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-      if (driverErr || !driver) {
-        setLoadError(
-          "No driver account found. Ask your admin to provision access.",
-        );
-        return;
-      }
-      setDriverId(driver.id);
-      setCompanyId(driver.company_id);
-
-      const { data: tankRows, error: tankErr } = await supabase
-        .from("tank_types")
-        .select("id, chart_number, manufacturer, capacity_liters")
-        .order("chart_number");
-
-      if (cancelled) return;
-      if (tankErr) {
-        setLoadError(tankErr.message);
-        return;
-      }
-      setTanks((tankRows ?? []) as TankType[]);
     })();
     return () => {
       cancelled = true;
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     };
-  }, [supabase, router]);
+  }, [supabase, router, refreshOutboxCounts, runFlush]);
 
   async function logout() {
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();
+  }
+
+  if (trialBlocked) {
+    return (
+      <main className="mx-auto max-w-lg px-4 py-10">
+        <h1 className="text-xl font-bold text-[var(--text)]">Trial ended</h1>
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          Your trial has ended. Connect online and renew to keep using the
+          calculator. Offline saves are disabled.
+        </p>
+        <Link
+          href="/trial-ended"
+          className="mt-6 inline-flex min-h-11 items-center font-bold text-[var(--accent)]"
+        >
+          View options
+        </Link>
+      </main>
+    );
   }
 
   if (loadError) {
@@ -121,7 +338,11 @@ export default function CalculatorClient() {
     );
   }
 
-  const ready = driverId !== null && companyId !== null;
+  const ready =
+    bootDone &&
+    driverId !== null &&
+    companyId !== null &&
+    initialSlotDrafts !== null;
 
   return (
     <main className="mx-auto w-full max-w-lg px-4 pb-24 pt-6">
@@ -133,7 +354,16 @@ export default function CalculatorClient() {
           <h1 className="text-2xl font-bold text-[var(--text)]">Tank calculator</h1>
         </div>
         <div className="flex gap-3 text-sm font-bold">
-          <Link href="/history" className="min-h-11 content-center text-[var(--accent)]">
+          <Link
+            href="/history"
+            className={`min-h-11 content-center ${
+              online
+                ? "text-[var(--accent)]"
+                : "pointer-events-none text-[var(--muted)] opacity-50"
+            }`}
+            aria-disabled={!online}
+            title={online ? undefined : "History requires a network connection"}
+          >
             History
           </Link>
           <button
@@ -146,9 +376,23 @@ export default function CalculatorClient() {
         </div>
       </header>
 
+      <OfflineBanner
+        online={online}
+        pendingCount={pendingCount}
+        failedCount={failedCount}
+      />
+      <InstallHint />
+
       <p className="mb-4 rounded-lg border border-[var(--warn)] bg-[var(--warn-bg)] px-3 py-2.5 text-sm font-medium text-[var(--warn-fg)]">
         {SAFETY_REMINDER}
       </p>
+
+      {!online && tanks.length === 0 && (
+        <p className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--muted)]">
+          No cached tanks yet. Open each tank once while online to use it
+          offline.
+        </p>
+      )}
 
       <div className="mb-4 grid grid-cols-4 gap-2">
         {Array.from({ length: SLOT_COUNT }, (_, index) => {
@@ -189,6 +433,9 @@ export default function CalculatorClient() {
               driverId={driverId}
               companyId={companyId}
               supabase={supabase}
+              initialDraft={initialSlotDrafts[index]}
+              onDraftChange={(draft) => onSlotDraftChange(index, draft)}
+              onOutboxChange={() => void refreshOutboxCounts()}
               onSelectedChartChange={chartSetters[index]}
               onSelectedProductChange={productSetters[index]}
             />

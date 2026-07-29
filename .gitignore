@@ -13,6 +13,10 @@ node_modules/
 *.tsbuildinfo
 next-env.d.ts
 
+# Serwist generated service worker
+/public/sw*
+/public/swe-worker*
+
 # Python ETL venv
 .venv/
 __pycache__/

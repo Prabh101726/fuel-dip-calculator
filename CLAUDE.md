@@ -10,28 +10,27 @@ dip and get delivered volume + reconciliation.
 Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 
 **Status:** Foundation (Jul 23), driver-facing + password auth (Jul 23),
-multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**, and
-**calculator form UX (Jul 28)** are merged to `main` and **live in production**:
+multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
+**calculator form UX (Jul 28)**, and **offline PWA / Project 2 (Jul 29)** are
+merged to `main` and **live in production**:
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: email/password signup with Confirm email, forgot-password /
 `/auth/reset-password`, **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
 company/driver on first confirmed signup or sign-in, 4-tab multi-tank
 calculator with **product-grade dropdown** (tab labels show product when
-selected), public `/privacy` + `/terms`, safety reminders, and flat history.
-Jul 26 also fixed a safety-critical tank-picker race (stale dip-chart fetch)
-and named operators **SRV Freight Inc and Detours Fleet Operations** on legal
-pages. Current soft-launch tag: **v0.2.0**. Specs:
+selected), **installable PWA** with used-tank chart cache, draft restore, and
+offline save queue, public `/privacy` + `/terms`, safety reminders, and flat
+history. Jul 26 also fixed a safety-critical tank-picker race (stale dip-chart
+fetch) and named operators **SRV Freight Inc and Detours Fleet Operations** on
+legal pages. Current soft-launch tag: **v0.2.0**. Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
-`docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`. Original v1
+`docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`,
+`docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged twice** — magic-link trial → password auth; password is live).
 
 **Still open / next priorities:**
-- **PWA / full offline (Project 2)** — still a plain responsive web app.
-  Planned: installable shell, cache dip charts, offline calc, queued saves,
-  drafts that survive swipe-up. Est. ~1–2 weeks. Schema allows offline queue
-  later without rewrite; don't build until asked.
 - **Stripe after trial** — `$2.99/month` is copy-only on `/trial-ended` today;
   Checkout + webhook + subscription unlock not built (est. ~2–3 days MVP /
   ~4–6 days solid).
@@ -177,7 +176,16 @@ Spec: `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`
   “Select product…”). Still stored as `product_grade` text.
 - **Compartment #** removed from UI; saves `compartment_no: null` (column kept).
 - **Location label** moved to the bottom of the After delivery section.
-- No schema migration.
+- **Installable offline PWA (Project 2, Jul 29 2026).** Serwist service
+  worker caches the app shell only (never Supabase API). IndexedDB
+  (`lib/offline/`) holds used-tank charts (meta + points), session meta
+  (`driverId` / `companyId` / `trialEndsAt`), 4-slot drafts, and a save
+  outbox. Offline boot uses local `getSession` + IDB (A1); expired trials are
+  gated client-side (A2); chart loads keep the stale-response guard (A3);
+  outbox flush poisons non-network failures (A4) and refreshes session once on
+  401 (A5). History remains online-only. Spec:
+  `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Local PWA test:
+  `npm run build && npm start` (or `npm run dev:pwa`).
 
 ## Load-bearing constraints
 
@@ -195,10 +203,9 @@ Spec: `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`
   safe-fill % directly per calculation, with a free-text location label. Don't
   reintroduce a `sites` table without checking the spec's "Out of Scope" section
   first; it was cut deliberately to avoid upfront admin setup blocking driver use.
-- **Still a plain responsive web app, no offline/PWA.** Schema should still
-  support an offline save queue later without a rewrite; Project 2 (full
-  offline PWA) is the planned next large build when asked — don't start it
-  unprompted.
+- **PWA caches app shell + used tanks only.** Do not add Supabase REST caching
+  in the service worker. Offline requires a prior online sign-in; uncached tanks
+  must show a clear “open once online” error rather than guessing volumes.
 ## Source data
 
 - `~/Downloads/FLT - DIPCHARTS (1) 2.pdf` — 327-page dip chart catalog, real
