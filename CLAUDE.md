@@ -38,22 +38,39 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **H3 ops (user):** Supabase Dashboard → Authentication → Passwords → enable
   **Leaked password protection** (HaveIBeenPwned). Do not `supabase config push`.
+- **Project 2 on-device manual checklist** not yet confirmed: install PWA →
+  airplane mode → cached-tank calc → queued save → reconnect flush → draft
+  restore after swipe-up → expired-trial offline gate.
 - Signature capture (image), history filtering, 12 flagged tanks in
-  `review_needed.json`, Sentry — deferred.
+  `review_needed.json`, Sentry, mismatch-audit UI — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
   (can clobber dashboard Auth URL / Confirm email settings).
 
 ## Security hardenings (Jul 29 2026)
 
-Migration `20260729140000_security_hardenings.sql` applied live:
+Migration `20260729140000_security_hardenings.sql` applied live (review gate
+passed Jul 29 — SQL interpolation verified against regression tanks
+#014/#015/#526):
 - **H1:** `my_trial_active()` + insert/update RLS on `dip_calculations` (SELECT
-  ungated). Null `trial_ends_at` = active.
-- **H2:** store-both `server_*` columns + `volume_mismatch`; BEFORE INSERT OR
-  UPDATE trigger; never blocks saves. Spec:
+  ungated — expired trials keep read access; middleware still gates the UI).
+  Null `trial_ends_at` = active, matching middleware. **Stripe hook:** when
+  billing lands, extend `my_trial_active()` with `or subscription_active`
+  rather than adding a second policy check.
+- **H2:** store-both `server_*` columns + `volume_mismatch`; **BEFORE INSERT OR
+  UPDATE** trigger (`recompute_dip_volumes()` → `interpolate_dip_volume()`,
+  mirrors `interpolate.ts`: exact / linear / out-of-range → null, never
+  extrapolates); never blocks saves. Tolerance is **0.5 L** — safe because the
+  client does no rounding, so honest divergence is float-vs-numeric noise. A
+  null `after_dip_cm` must never flag a mismatch (after-side checks are gated
+  on its presence). Mismatch rows are audit-only; no UI on purpose. Spec:
   `docs/superpowers/specs/2026-07-29-security-hardenings-design.md`.
 - **H4:** `/auth/callback` `next` allowlisted to `/calculator` | `/history`
-  via `lib/auth/safeNextPath.ts`.
+  via `lib/auth/safeNextPath.ts` (fixed a real open redirect —
+  `next=@evil.com` produced a userinfo-host URL).
 - **H3:** still manual dashboard toggle (see Still open).
+- Interplay: an expired-trial row flushed from the offline outbox now gets a
+  42501 RLS rejection → classified poison (surfaced as failed, queue not
+  wedged) — by design.
 
 ## What's built (foundation phase)
 
@@ -187,16 +204,38 @@ Spec: `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`
   “Select product…”). Still stored as `product_grade` text.
 - **Compartment #** removed from UI; saves `compartment_no: null` (column kept).
 - **Location label** moved to the bottom of the After delivery section.
-- **Installable offline PWA (Project 2, Jul 29 2026).** Serwist service
-  worker caches the app shell only (never Supabase API). IndexedDB
-  (`lib/offline/`) holds used-tank charts (meta + points), session meta
-  (`driverId` / `companyId` / `trialEndsAt`), 4-slot drafts, and a save
-  outbox. Offline boot uses local `getSession` + IDB (A1); expired trials are
-  gated client-side (A2); chart loads keep the stale-response guard (A3);
-  outbox flush poisons non-network failures (A4) and refreshes session once on
-  401 (A5). History remains online-only. Spec:
-  `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Local PWA test:
-  `npm run build && npm start` (or `npm run dev:pwa`).
+
+## Offline PWA / Project 2 (Jul 29 2026)
+
+Serwist service worker caches the app shell only (never Supabase API).
+IndexedDB (`lib/offline/`) holds used-tank charts (meta + points), session
+meta (`driverId` / `companyId` / `trialEndsAt`), 4-slot drafts, and a save
+outbox. Offline boot uses local `getSession` + IDB (A1); expired trials are
+gated client-side (A2); chart loads keep the stale-response guard (A3);
+outbox flush poisons non-network failures (A4) and refreshes session once on
+401 (A5). History remains online-only. Spec:
+`docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Local PWA test:
+`npm run build && npm start` (or `npm run dev:pwa`).
+
+Review-hardened in `6e7f643` — three constraints from that fix round are
+load-bearing:
+
+- **`draftsReadyRef` gates draft persistence** in `CalculatorClient.tsx` —
+  nothing may write the IDB draft until boot has hydrated `slotDraftsRef` from
+  `getDraft()`. Online boot regularly takes >400ms (4 network calls), so an
+  early debounced persist clobbers real drafts with blanks. Don't remove the
+  gate or persist from anywhere that can run pre-hydration.
+- **Never precache auth-gated routes** (`next.config.ts`): a SW installing on
+  `/login` before sign-in follows the middleware redirect and stores login
+  HTML under the precached key until the next deploy. Only `/~offline` is
+  precached; the calculator shell relies on runtime document caching after the
+  required online sign-in.
+- **Outbox error classification is message/code-based**
+  (`lib/offline/flushOutbox.ts`): `PostgrestError` exposes `code`, not an HTTP
+  `status` — don't reintroduce status-based branches. `PGRST301`/JWT →
+  refresh-once-and-retry; `42501`/`23514`/`23505`/"violates…" → poison
+  (mark failed, surface, don't block the queue); unknown errors default to
+  poison so the queue can never wedge.
 
 ## Load-bearing constraints
 
