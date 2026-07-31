@@ -22,8 +22,9 @@ export async function GET(request: Request) {
     if (!error) {
       await supabase.rpc("ensure_trial_driver");
 
-      const { data: trialEndsAt } = await supabase.rpc("my_trial_ends_at");
-      if (trialEndsAt && new Date(trialEndsAt as string).getTime() <= Date.now()) {
+      const { data: accessActive, error: accessErr } =
+        await supabase.rpc("my_access_active");
+      if (accessErr || accessActive !== true) {
         return NextResponse.redirect(`${origin}/trial-ended`);
       }
 

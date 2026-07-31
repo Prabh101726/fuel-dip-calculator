@@ -39,10 +39,10 @@ export default function TermsPage() {
         <section className="space-y-2">
           <h2 className="text-base font-bold">Trial and paid plans</h2>
           <p className="text-[var(--muted)]">
-            New drivers receive a {TRIAL_DAYS}-day trial. We plan to offer paid
-            access at {MONTHLY_PRICE_LABEL}. Payment processing is not live yet;
-            after the trial, calculator and history access may be locked until a
-            paid plan is available or access is arranged.
+            New drivers receive a {TRIAL_DAYS}-day trial. Paid access is{" "}
+            {MONTHLY_PRICE_LABEL}, billed through Stripe. After the trial,
+            calculator and history access stay locked until you subscribe (or
+            access is arranged).
           </p>
         </section>
 

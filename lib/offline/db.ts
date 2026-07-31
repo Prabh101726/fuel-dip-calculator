@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { isAccessActive } from "@/lib/billing/access";
 import type { DipChartPoint } from "@/lib/dip-calculator/types";
 import type { SafeFillPct } from "@/lib/dip-calculations/toInsertPayload";
 
@@ -33,6 +34,8 @@ export type OfflineSessionMeta = {
   driverId: string;
   companyId: string;
   trialEndsAt: string | null;
+  /** This driver's Stripe subscription.status; null if never subscribed / unknown. */
+  subscriptionStatus: string | null;
   updatedAt: string;
 };
 
@@ -271,4 +274,15 @@ export function isTrialExpired(trialEndsAt: string | null | undefined): boolean 
   const ends = new Date(trialEndsAt).getTime();
   if (Number.isNaN(ends)) return false;
   return ends <= Date.now();
+}
+
+/** Offline gate: blocked when trial ended and this driver has no paying status. */
+export function isOfflineAccessBlocked(
+  meta: Pick<OfflineSessionMeta, "trialEndsAt" | "subscriptionStatus"> | null | undefined,
+): boolean {
+  if (!meta) return true;
+  return !isAccessActive({
+    trialEndsAt: meta.trialEndsAt,
+    subscriptionStatus: meta.subscriptionStatus,
+  });
 }

@@ -10,7 +10,7 @@ import {
   getSessionMeta,
   getTankCatalog,
   isBrowserOnline,
-  isTrialExpired,
+  isOfflineAccessBlocked,
   listCachedTanks,
   listOutbox,
   putDraft,
@@ -39,6 +39,7 @@ export default function CalculatorClient() {
   const [tanks, setTanks] = useState<TankType[]>([]);
   const [loadError, setLoadError] = useState("");
   const [trialBlocked, setTrialBlocked] = useState(false);
+  const [hasBillingCustomer, setHasBillingCustomer] = useState(false);
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -216,7 +217,7 @@ export default function CalculatorClient() {
       const meta = await getSessionMeta();
       if (!meta) return false;
 
-      if (isTrialExpired(meta.trialEndsAt)) {
+      if (isOfflineAccessBlocked(meta)) {
         setTrialBlocked(true);
         setBootDone(true);
         return true;
@@ -246,14 +247,14 @@ export default function CalculatorClient() {
 
       const { data: driver, error: driverErr } = await supabase
         .from("drivers")
-        .select("id, company_id")
+        .select("id, company_id, stripe_customer_id, subscription_status")
         .eq("id", user.id)
         .maybeSingle();
 
       if (cancelled) return false;
       if (driverErr || !driver) {
         setLoadError(
-          "No driver account found. Ask your admin to provision access.",
+          "No driver account found. Sign out and create an account again.",
         );
         return false;
       }
@@ -266,16 +267,27 @@ export default function CalculatorClient() {
         : typeof trialEndsAt === "string"
           ? trialEndsAt
           : null;
+      const subscriptionStatus =
+        typeof driver.subscription_status === "string"
+          ? driver.subscription_status
+          : (existingMeta?.subscriptionStatus ?? null);
 
       await putSessionMeta({
         driverId: driver.id,
         companyId: driver.company_id,
         trialEndsAt: trial,
+        subscriptionStatus,
         updatedAt: new Date().toISOString(),
       });
 
       if (cancelled) return false;
-      if (isTrialExpired(trial)) {
+      setHasBillingCustomer(Boolean(driver.stripe_customer_id));
+      if (
+        isOfflineAccessBlocked({
+          trialEndsAt: trial,
+          subscriptionStatus,
+        })
+      ) {
         setTrialBlocked(true);
         return false;
       }
@@ -373,14 +385,14 @@ export default function CalculatorClient() {
       <main className="mx-auto max-w-lg px-4 py-10">
         <h1 className="text-xl font-bold text-[var(--text)]">Trial ended</h1>
         <p className="mt-3 text-sm text-[var(--muted)]">
-          Your trial has ended. Connect online and renew to keep using the
-          calculator. Offline saves are disabled.
+          Your trial has ended. Subscribe online to keep using the calculator.
+          Offline saves are disabled until access is restored.
         </p>
         <Link
           href="/trial-ended"
           className="mt-6 inline-flex min-h-11 items-center font-bold text-[var(--accent)]"
         >
-          View options
+          Subscribe
         </Link>
       </main>
     );
@@ -416,7 +428,7 @@ export default function CalculatorClient() {
           </p>
           <h1 className="text-2xl font-bold text-[var(--text)]">Tank calculator</h1>
         </div>
-        <div className="flex gap-3 text-sm font-bold">
+        <div className="flex flex-wrap justify-end gap-3 text-sm font-bold">
           <Link
             href="/history"
             className={`min-h-11 content-center ${
@@ -429,6 +441,22 @@ export default function CalculatorClient() {
           >
             History
           </Link>
+          {hasBillingCustomer && online && (
+            <button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  const res = await fetch("/api/stripe/portal", { method: "POST" });
+                  const body = (await res.json()) as { url?: string; error?: string };
+                  if (!res.ok || !body.url) return;
+                  window.location.href = body.url;
+                })();
+              }}
+              className="min-h-11 text-[var(--accent)]"
+            >
+              Billing
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void logout()}

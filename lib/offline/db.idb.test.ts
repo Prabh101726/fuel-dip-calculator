@@ -46,6 +46,7 @@ describe("offline IDB helpers", () => {
       driverId: "d1",
       companyId: "c1",
       trialEndsAt: "2099-01-01T00:00:00.000Z",
+      subscriptionStatus: null,
       updatedAt: "2026-07-29T00:00:00.000Z",
     });
     const meta = await getSessionMeta();

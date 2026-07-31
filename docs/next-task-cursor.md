@@ -36,13 +36,19 @@ Offline PWA + security hardenings already shipped.
 - `supabase config push`
 - Cache Stripe API in the service worker
 
-## Ops prerequisites (user)
+## Ops prerequisites (user) — remaining
 
-1. Create Product/Price in CAD — save `STRIPE_PRICE_ID`
-2. Vercel env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`,
-   `SUPABASE_SERVICE_ROLE_KEY`
-3. Webhook → `https://fuel-dip-calculator.vercel.app/api/stripe/webhook`
-4. Enable Customer Portal (cancel + update payment method)
+Product/Price already live:
+- Product `prod_UzHfQGqENZ1QUU`
+- Price `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD $2.99/mo, lookup `fuel_dip_monthly`)
+
+1. Vercel Production env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+   `STRIPE_PRICE_ID=price_1TzJ6e13QgrVjwffdpj7y0nD`, `SUPABASE_SERVICE_ROLE_KEY`
+   (and local `.env.local` for the two Stripe secrets)
+2. Stripe webhook → `https://fuel-dip-calculator.vercel.app/api/stripe/webhook`
+   (events: `checkout.session.completed`, `customer.subscription.*`)
+3. Enable Customer Portal (cancel + update payment method)
+4. Redeploy after env vars
 
 ## Out of scope (still deferred)
 

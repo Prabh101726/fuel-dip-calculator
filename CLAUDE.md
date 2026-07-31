@@ -31,10 +31,11 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged twice** — magic-link trial → password auth; password is live).
 
 **Still open / next priorities:**
-- **Stripe after trial** — `$2.99 CAD/month per driver` (direct-to-driver, not
-  fleet/company billing) is copy-only on `/trial-ended` today;
-  Checkout + webhook + subscription unlock not built (est. ~2–3 days MVP /
-  ~4–6 days solid).
+- **Stripe after trial** — `$2.99 CAD/month per driver` Checkout + webhook +
+  access unlock shipped in code; ops still need live `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`, Customer Portal enable, and webhook endpoint on
+  Vercel. Product `prod_UzHfQGqENZ1QUU` / Price `price_1TzJ6e13QgrVjwffdpj7y0nD`
+  (CAD, lookup `fuel_dip_monthly`).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **H3 ops (user):** Supabase Dashboard → Authentication → Passwords → enable

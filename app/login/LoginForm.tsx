@@ -40,8 +40,8 @@ export default function LoginForm() {
   async function afterAuth() {
     const supabase = createClient();
     await supabase.rpc("ensure_trial_driver");
-    const { data: trialEndsAt } = await supabase.rpc("my_trial_ends_at");
-    if (trialEndsAt && new Date(trialEndsAt as string).getTime() <= Date.now()) {
+    const { data: accessActive, error } = await supabase.rpc("my_access_active");
+    if (error || accessActive !== true) {
       router.replace("/trial-ended");
       router.refresh();
       return;

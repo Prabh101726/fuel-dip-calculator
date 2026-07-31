@@ -17,7 +17,7 @@ Built under **SRV Freight Inc** / **Detours Fleet Operations**, separate from
 
 - Email/password signup & sign-in (Confirm email enabled)
 - Forgot password / reset
-- 7-day trial (new drivers); planned paid plan **$2.99 CAD/month per driver** (copy only — Stripe not shipped yet)
+- 7-day trial (new drivers); paid plan **$2.99 CAD/month per driver** via Stripe Checkout
 - 4-tab multi-tank calculator
 - **Installable PWA** — used-tank chart cache, draft restore after swipe-up, offline save queue (History still needs network)
 - History, Privacy, Terms, safety reminders

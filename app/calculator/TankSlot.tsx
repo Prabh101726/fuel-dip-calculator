@@ -23,7 +23,7 @@ import {
   getSessionMeta,
   isBrowserOnline,
   isNetworkLikeError,
-  isTrialExpired,
+  isOfflineAccessBlocked,
   putCachedTank,
   type SlotDraft,
 } from "@/lib/offline/db";
@@ -451,8 +451,10 @@ export default function TankSlot({
     }
 
     const meta = await getSessionMeta();
-    if (isTrialExpired(meta?.trialEndsAt)) {
-      setSaveError("Trial ended — connect online to renew. Offline saves are blocked.");
+    if (isOfflineAccessBlocked(meta)) {
+      setSaveError(
+        "Access ended — subscribe online. Offline saves are blocked.",
+      );
       return;
     }
 

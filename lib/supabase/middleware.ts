@@ -35,7 +35,8 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/auth/") ||
     path === "/trial-ended" ||
     path === "/privacy" ||
-    path === "/terms";
+    path === "/terms" ||
+    path === "/api/stripe/webhook";
 
   if (!user && !isPublic && path !== "/") {
     const url = request.nextUrl.clone();
@@ -56,14 +57,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && (path === "/calculator" || path === "/history" || path === "/")) {
-    const { data: trialEndsAt, error } = await supabase.rpc("my_trial_ends_at");
-    if (!error && trialEndsAt) {
-      const ends = new Date(trialEndsAt as string);
-      if (ends.getTime() <= Date.now()) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/trial-ended";
-        return NextResponse.redirect(url);
-      }
+    const { data: accessActive, error } = await supabase.rpc("my_access_active");
+    if (error || accessActive !== true) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/trial-ended";
+      return NextResponse.redirect(url);
     }
     if (path === "/") {
       const url = request.nextUrl.clone();
