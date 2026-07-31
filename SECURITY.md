@@ -37,7 +37,7 @@ We aim to acknowledge reports within a few business days.
 These are intentional or deferred — not considered resolved:
 
 - **Open self-signup** — anyone can create an account and start a trial (email confirm required)
-- **Paid billing** (`$2.99/month`) is messaging only — Stripe Checkout / webhooks not shipped
+- **Paid billing** (`$2.99 CAD/month per driver`, direct-to-driver) is messaging only — Stripe Checkout / webhooks not shipped
 - **Offline History** is not supported — History needs network
 - **Leaked-password protection** — enable in Supabase Dashboard → Auth → Passwords (HaveIBeenPwned); do not `supabase config push`
 - **Mismatch UI** — `volume_mismatch` rows are audit/query only; no driver-facing banner yet

@@ -31,7 +31,8 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged twice** — magic-link trial → password auth; password is live).
 
 **Still open / next priorities:**
-- **Stripe after trial** — `$2.99/month` is copy-only on `/trial-ended` today;
+- **Stripe after trial** — `$2.99 CAD/month per driver` (direct-to-driver, not
+  fleet/company billing) is copy-only on `/trial-ended` today;
   Checkout + webhook + subscription unlock not built (est. ~2–3 days MVP /
   ~4–6 days solid).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
@@ -71,6 +72,9 @@ passed Jul 29 — SQL interpolation verified against regression tanks
 - Interplay: an expired-trial row flushed from the offline outbox now gets a
   42501 RLS rejection → classified poison (surfaced as failed, queue not
   wedged) — by design.
+- **Driver-only RLS (Jul 31):** migration `20260731161454_driver_only_rls` —
+  `drivers` / `dip_calculations` SELECT scoped to `auth.uid()` (no peer
+  sharing). Writes already required `driver_id = auth.uid()`.
 
 ## What's built (foundation phase)
 
@@ -157,7 +161,7 @@ plan under `docs/superpowers/`.
   tank charts before delivery.
 - **Trial:** migration `20260726175154_seven_day_trial.sql` — 7-day default +
   `ensure_trial_driver()` insert; existing companies unchanged. Trial-ended
-  page mentions planned **$2.99/month** (copy only; `MONTHLY_PRICE_LABEL` in
+  page mentions planned **$2.99 CAD/month** (copy only; `MONTHLY_PRICE_LABEL` in
   `lib/app-copy.ts`).
 - **Tank-chart race fix** (commit `c6c012a`): `TankSlot` keeps
   `selectedTankIdRef` and ignores stale `dip_chart_points` responses via

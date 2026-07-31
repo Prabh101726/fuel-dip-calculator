@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CONTACT_EMAIL,
+  MONTHLY_PRICE_CAD,
   MONTHLY_PRICE_LABEL,
-  MONTHLY_PRICE_USD,
   SAFETY_REMINDER,
   TRIAL_DAYS,
   authCallbackUrl,
@@ -16,8 +16,8 @@ describe("app-copy", () => {
       "Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.",
     );
     expect(TRIAL_DAYS).toBe(7);
-    expect(MONTHLY_PRICE_USD).toBe(2.99);
-    expect(MONTHLY_PRICE_LABEL).toBe("$2.99/month");
+    expect(MONTHLY_PRICE_CAD).toBe(2.99);
+    expect(MONTHLY_PRICE_LABEL).toBe("$2.99 CAD/month per driver");
   });
 
   it("builds auth redirect URLs without trailing junk", () => {

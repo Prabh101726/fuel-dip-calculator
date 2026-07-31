@@ -5,10 +5,10 @@ export const SAFETY_REMINDER =
 
 export const TRIAL_DAYS = 7;
 
-/** Planned subscription price (copy-only until Stripe ships). */
-export const MONTHLY_PRICE_USD = 2.99;
+/** Planned per-driver subscription price in CAD (copy-only until Stripe ships). */
+export const MONTHLY_PRICE_CAD = 2.99;
 
-export const MONTHLY_PRICE_LABEL = `$${MONTHLY_PRICE_USD.toFixed(2)}/month`;
+export const MONTHLY_PRICE_LABEL = `$${MONTHLY_PRICE_CAD.toFixed(2)} CAD/month per driver`;
 
 export function authCallbackUrl(origin: string): string {
   return `${origin.replace(/\/$/, "")}/auth/callback`;
