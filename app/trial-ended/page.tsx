@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
+import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import { startCheckout } from "@/lib/billing/startCheckout";
 import { createClient } from "@/lib/supabase/client";
 
@@ -11,6 +12,38 @@ export default function TrialEndedPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) {
+        setChecking(false);
+        return;
+      }
+
+      const { data: driver } = await supabase
+        .from("drivers")
+        .select("subscription_status")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (isActiveSubscriptionStatus(driver?.subscription_status)) {
+        router.replace("/calculator");
+        return;
+      }
+      setChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function logout() {
     const supabase = createClient();
@@ -23,7 +56,7 @@ export default function TrialEndedPage() {
     setBusy(true);
     setError("");
     try {
-      const url = await startCheckout();
+      const url = await startCheckout({ cancelPath: "/trial-ended" });
       window.location.href = url;
     } catch (err) {
       setError(
@@ -33,6 +66,14 @@ export default function TrialEndedPage() {
       );
       setBusy(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-4 py-12">
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
+      </main>
+    );
   }
 
   return (

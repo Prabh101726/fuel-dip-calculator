@@ -185,6 +185,14 @@ export async function clearDraft(): Promise<void> {
   await db.delete("drafts", "current");
 }
 
+/** Clears per-driver offline state on logout (keeps shared tank chart cache). */
+export async function clearOfflineUserData(): Promise<void> {
+  const db = await getOfflineDb();
+  await db.delete("session", "current");
+  await db.delete("drafts", "current");
+  await db.clear("outbox");
+}
+
 export async function enqueueOutbox(
   payload: Record<string, unknown>,
 ): Promise<OutboxItem> {

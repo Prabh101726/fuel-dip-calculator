@@ -7,6 +7,7 @@ import { SAFETY_REMINDER } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import {
   blankSlotDraft,
+  clearOfflineUserData,
   getDraft,
   getSessionMeta,
   getTankCatalog,
@@ -42,6 +43,7 @@ export default function CalculatorClient() {
   const [trialBlocked, setTrialBlocked] = useState(false);
   const [hasBillingCustomer, setHasBillingCustomer] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [billingError, setBillingError] = useState("");
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -392,6 +394,11 @@ export default function CalculatorClient() {
   }, [supabase, router, refreshOutboxCounts, runFlush]);
 
   async function logout() {
+    try {
+      await clearOfflineUserData();
+    } catch {
+      // Best-effort; still sign out.
+    }
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();
@@ -471,10 +478,25 @@ export default function CalculatorClient() {
               type="button"
               onClick={() => {
                 void (async () => {
-                  const res = await fetch("/api/stripe/portal", { method: "POST" });
-                  const body = (await res.json()) as { url?: string; error?: string };
-                  if (!res.ok || !body.url) return;
-                  window.location.href = body.url;
+                  setBillingError("");
+                  try {
+                    const res = await fetch("/api/stripe/portal", {
+                      method: "POST",
+                    });
+                    const body = (await res.json()) as {
+                      url?: string;
+                      error?: string;
+                    };
+                    if (!res.ok || !body.url) {
+                      setBillingError(
+                        body.error ?? "Could not open billing portal.",
+                      );
+                      return;
+                    }
+                    window.location.href = body.url;
+                  } catch {
+                    setBillingError("Could not open billing portal.");
+                  }
                 })();
               }}
               className="min-h-11 text-[var(--accent)]"
@@ -492,6 +514,11 @@ export default function CalculatorClient() {
         </div>
       </header>
 
+      {billingError !== "" && (
+        <p className="mb-4 text-sm font-semibold text-[var(--danger)]" role="status">
+          {billingError}
+        </p>
+      )}
       <OfflineBanner
         online={online}
         pendingCount={pendingCount}

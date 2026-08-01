@@ -9,6 +9,7 @@ import {
   authCallbackUrl,
   resetPasswordUrl,
 } from "@/lib/app-copy";
+import { safePostAuthNext } from "@/lib/auth/safeNextPath";
 import { createClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
@@ -41,12 +42,14 @@ export default function LoginForm() {
     const supabase = createClient();
     await supabase.rpc("ensure_trial_driver");
     const { data: accessActive, error } = await supabase.rpc("my_access_active");
+    const next = safePostAuthNext(searchParams.get("next"));
     if (error || accessActive !== true) {
-      router.replace("/trial-ended");
+      // Expired trial: allow /subscribe so they can pay; otherwise lock screen.
+      router.replace(next === "/subscribe" ? "/subscribe" : "/trial-ended");
       router.refresh();
       return;
     }
-    router.replace("/calculator");
+    router.replace(next);
     router.refresh();
   }
 

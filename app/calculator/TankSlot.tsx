@@ -24,6 +24,7 @@ import {
   type SafeFillPct,
 } from "@/lib/dip-calculations/toInsertPayload";
 import { formatLiters, formatSignedLiters } from "@/lib/format-liters";
+import { draftTankIdentity } from "@/lib/calculator/draftTankIdentity";
 import {
   blankSlotDraft,
   enqueueOutbox,
@@ -162,6 +163,8 @@ const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [queuedFlash, setQueuedFlash] = useState(false);
+  /** After Clear/Reset, draft must not fall back to boot-time seed tank. */
+  const [tankCleared, setTankCleared] = useState(false);
 
   useEffect(() => {
     if (!savedFlash && !queuedFlash) return;
@@ -182,6 +185,7 @@ const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
 
   function resetSlot() {
     selectedTankIdRef.current = null;
+    setTankCleared(true);
     setTankQuery("");
     setSelectedTank(null);
     setTankPoints([]);
@@ -208,6 +212,7 @@ const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
 
   async function selectTank(tank: TankType) {
     selectedTankIdRef.current = tank.id;
+    setTankCleared(false);
     setSelectedTank(tank);
     onSelectedChartChange(tank.chart_number);
     setTankQuery("");
@@ -330,9 +335,17 @@ const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
 
   useEffect(() => {
     if (!onDraftChange) return;
+    const tankIds = draftTankIdentity({
+      selectedTank: selectedTank
+        ? { id: selectedTank.id, chart_number: selectedTank.chart_number }
+        : null,
+      seedTankTypeId: seed.tankTypeId,
+      seedChartNumber: seed.chartNumber,
+      tankCleared,
+    });
     onDraftChange({
-      tankTypeId: selectedTank?.id ?? seed.tankTypeId,
-      chartNumber: selectedTank?.chart_number ?? seed.chartNumber,
+      tankTypeId: tankIds.tankTypeId,
+      chartNumber: tankIds.chartNumber,
       productGrade,
       safeFillPct,
       locationLabel,
@@ -347,6 +360,7 @@ const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
   }, [
     seed.tankTypeId,
     seed.chartNumber,
+    tankCleared,
     selectedTank,
     productGrade,
     safeFillPct,
@@ -363,6 +377,7 @@ const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
 
   function clearSelectedTankOnly() {
     selectedTankIdRef.current = null;
+    setTankCleared(true);
     setSelectedTank(null);
     onSelectedChartChange(null);
     setTankPoints([]);

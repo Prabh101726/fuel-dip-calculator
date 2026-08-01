@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { isActiveSubscriptionStatus } from "@/lib/billing/access";
+import { safeCheckoutCancelPath } from "@/lib/auth/safeNextPath";
 import { getStripe, getStripePriceId } from "@/lib/stripe/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -23,12 +25,27 @@ export async function POST(request: Request) {
 
   const { data: driver, error: driverErr } = await supabase
     .from("drivers")
-    .select("id, stripe_customer_id")
+    .select("id, stripe_customer_id, subscription_status")
     .eq("id", user.id)
     .maybeSingle();
 
   if (driverErr || !driver) {
     return NextResponse.json({ error: "Driver not found" }, { status: 400 });
+  }
+
+  if (isActiveSubscriptionStatus(driver.subscription_status)) {
+    return NextResponse.json(
+      { error: "Already subscribed. Manage billing from the calculator." },
+      { status: 409 },
+    );
+  }
+
+  let cancelPath = "/trial-ended" as ReturnType<typeof safeCheckoutCancelPath>;
+  try {
+    const body = (await request.json()) as { cancelPath?: string };
+    cancelPath = safeCheckoutCancelPath(body?.cancelPath);
+  } catch {
+    // Empty or non-JSON body → default cancel path
   }
 
   const stripe = getStripe();
@@ -66,7 +83,7 @@ export async function POST(request: Request) {
     },
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${origin}/calculator?checkout=success`,
-    cancel_url: `${origin}/trial-ended?checkout=cancel`,
+    cancel_url: `${origin}${cancelPath}?checkout=cancel`,
   });
 
   if (!session.url) {

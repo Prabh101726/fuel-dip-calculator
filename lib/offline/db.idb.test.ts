@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   blankCalculatorDraft,
+  clearOfflineUserData,
+  enqueueOutbox,
   getCachedTank,
   getDraft,
   getOfflineDb,
@@ -76,5 +78,33 @@ describe("offline IDB helpers", () => {
     const catalog = await getTankCatalog();
     expect(catalog?.tanks).toHaveLength(1);
     expect(catalog?.tanks[0].chart_number).toBe("015");
+  });
+
+  it("clearOfflineUserData removes session, drafts, and outbox", async () => {
+    await putSessionMeta({
+      driverId: "d1",
+      companyId: "c1",
+      trialEndsAt: null,
+      subscriptionStatus: null,
+      updatedAt: "2026-07-29T00:00:00.000Z",
+    });
+    await putDraft(blankCalculatorDraft(4));
+    await enqueueOutbox({ foo: 1 });
+    await putCachedTank({
+      tankTypeId: "t1",
+      chart_number: "526",
+      manufacturer: "X",
+      capacity_liters: 50000,
+      points: [{ dipCm: 0, volumeLiters: 0 }],
+      cachedAt: "2026-07-29T00:00:00.000Z",
+    });
+
+    await clearOfflineUserData();
+
+    expect(await getSessionMeta()).toBeUndefined();
+    expect(await getDraft()).toBeUndefined();
+    const db = await getOfflineDb();
+    expect(await db.getAll("outbox")).toHaveLength(0);
+    expect(await getCachedTank("t1")).toBeTruthy();
   });
 });

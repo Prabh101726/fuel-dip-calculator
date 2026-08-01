@@ -51,10 +51,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, ignored: true });
   }
 
-  const { error } = await query;
+  const { data, error } = await query.select("id");
   if (error) {
     console.error("stripe webhook driver update failed", error);
     return NextResponse.json({ error: "Update failed" }, { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    console.error("stripe webhook: no driver row matched", {
+      driverId: update.driverId,
+      stripeCustomerId: update.stripeCustomerId,
+    });
+    return NextResponse.json({ error: "No matching driver" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

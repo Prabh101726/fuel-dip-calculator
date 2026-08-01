@@ -49,7 +49,7 @@ export default function SubscribePage() {
     setError("");
     setLoading(true);
     try {
-      const url = await startCheckout();
+      const url = await startCheckout({ cancelPath: "/subscribe" });
       window.location.href = url;
     } catch (err) {
       setError(
