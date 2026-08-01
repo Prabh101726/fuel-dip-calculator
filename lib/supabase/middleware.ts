@@ -62,12 +62,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   // /subscribe: signed-in users only; skip access gate so trial drivers can pay early.
+  // After Checkout, allow /calculator?checkout=success through so the client can poll
+  // while the webhook catches up (avoids bouncing a just-paid driver to Subscribe).
   if (user && (path === "/calculator" || path === "/history" || path === "/")) {
-    const { data: accessActive, error } = await supabase.rpc("my_access_active");
-    if (error || accessActive !== true) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/trial-ended";
-      return NextResponse.redirect(url);
+    const awaitingCheckout =
+      path === "/calculator" &&
+      request.nextUrl.searchParams.get("checkout") === "success";
+    if (!awaitingCheckout) {
+      const { data: accessActive, error } = await supabase.rpc("my_access_active");
+      if (error || accessActive !== true) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/trial-ended";
+        return NextResponse.redirect(url);
+      }
     }
     if (path === "/") {
       const url = request.nextUrl.clone();

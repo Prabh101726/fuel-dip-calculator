@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAFETY_REMINDER } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
+import { waitForActiveSubscription } from "@/lib/billing/waitForActiveSubscription";
+import { needsDraftHydrationAfterUnlock } from "@/lib/calculator/needsDraftHydrationAfterUnlock";
 import {
   blankSlotDraft,
   clearOfflineUserData,
@@ -25,6 +24,9 @@ import {
 import { flushOutbox } from "@/lib/offline/flushOutbox";
 import { tankTabLabel } from "@/lib/product-grades";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import InstallHint from "./InstallHint";
 import OfflineBanner from "./OfflineBanner";
 import TankSlot, { type TankSlotHandle, type TankType } from "./TankSlot";
@@ -34,6 +36,7 @@ const DRAFT_DEBOUNCE_MS = 400;
 
 export default function CalculatorClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
   const [driverId, setDriverId] = useState<string | null>(null);
@@ -43,6 +46,7 @@ export default function CalculatorClient() {
   const [trialBlocked, setTrialBlocked] = useState(false);
   const [hasBillingCustomer, setHasBillingCustomer] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false);
   const [billingError, setBillingError] = useState("");
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -314,6 +318,17 @@ export default function CalculatorClient() {
       setDriverId(driver.id);
       setCompanyId(driver.company_id);
 
+      // Blocked cache paint skipped applyDraft — hydrate so we don't hang on Loading…
+      if (
+        needsDraftHydrationAfterUnlock({
+          draftsAlreadyReady: draftsReadyRef.current,
+        })
+      ) {
+        applyDraft(await getDraft());
+        await refreshOutboxCounts();
+        setBootDone(true);
+      }
+
       const { data: tankRows, error: tankErr } = await supabase
         .from("tank_types")
         .select("id, chart_number, manufacturer, capacity_liters")
@@ -393,7 +408,111 @@ export default function CalculatorClient() {
     };
   }, [supabase, router, refreshOutboxCounts, runFlush]);
 
+  const hydrateDraftsFromIdb = useCallback(async () => {
+    const draft = await getDraft();
+    if (draft?.slots?.length) {
+      const slots = Array.from({ length: SLOT_COUNT }, (_, i) =>
+        draft.slots[i] ?? blankSlotDraft(),
+      );
+      slotDraftsRef.current = slots;
+      const tab =
+        typeof draft.activeTab === "number" &&
+        draft.activeTab >= 0 &&
+        draft.activeTab < SLOT_COUNT
+          ? draft.activeTab
+          : 0;
+      setActiveTab(tab);
+      activeTabRef.current = tab;
+      setTabCharts(slots.map((s) => s.chartNumber));
+      setTabProducts(
+        slots.map((s) =>
+          s.productGrade.trim() === "" ? null : s.productGrade,
+        ),
+      );
+      draftsReadyRef.current = true;
+      setInitialSlotDrafts(slots);
+    } else {
+      draftsReadyRef.current = true;
+      setInitialSlotDrafts(
+        Array.from({ length: SLOT_COUNT }, () => blankSlotDraft()),
+      );
+    }
+    await refreshOutboxCounts();
+    setBootDone(true);
+  }, [refreshOutboxCounts]);
+
+  // After Stripe Checkout return: poll until webhook writes subscription_status
+  // so we don't show Subscribe (second checkout) during the lag window.
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "success") return;
+    if (!isBrowserOnline()) return;
+
+    const ac = new AbortController();
+    let cancelled = false;
+
+    void (async () => {
+      setConfirmingCheckout(true);
+
+      const ok = await waitForActiveSubscription(
+        async () => {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user) return null;
+          const { data: driver } = await supabase
+            .from("drivers")
+            .select("subscription_status, stripe_customer_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (driver?.stripe_customer_id) {
+            setHasBillingCustomer(true);
+          }
+          return typeof driver?.subscription_status === "string"
+            ? driver.subscription_status
+            : null;
+        },
+        { timeoutMs: 10_000, intervalMs: 800, signal: ac.signal },
+      );
+
+      if (cancelled) return;
+
+      if (ok) {
+        setSubscribed(true);
+        setTrialBlocked(false);
+        const meta = await getSessionMeta();
+        if (meta) {
+          await putSessionMeta({
+            ...meta,
+            subscriptionStatus: "active",
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        if (
+          needsDraftHydrationAfterUnlock({
+            draftsAlreadyReady: draftsReadyRef.current,
+          })
+        ) {
+          await hydrateDraftsFromIdb();
+        }
+      }
+
+      setConfirmingCheckout(false);
+      router.replace("/calculator");
+    })();
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [searchParams, supabase, router, hydrateDraftsFromIdb]);
+
   async function logout() {
+    if (pendingCount > 0) {
+      const ok = window.confirm(
+        `You have ${pendingCount} delivery save(s) still waiting to upload. Log out anyway? They will be removed from this device.`,
+      );
+      if (!ok) return;
+    }
     try {
       await clearOfflineUserData();
     } catch {
@@ -404,7 +523,7 @@ export default function CalculatorClient() {
     router.refresh();
   }
 
-  if (trialBlocked) {
+  if (trialBlocked && !confirmingCheckout) {
     return (
       <main className="mx-auto max-w-lg px-4 py-10">
         <h1 className="text-xl font-bold text-[var(--text)]">Trial ended</h1>
@@ -418,6 +537,18 @@ export default function CalculatorClient() {
         >
           Subscribe
         </Link>
+      </main>
+    );
+  }
+
+  if (confirmingCheckout && trialBlocked) {
+    return (
+      <main className="mx-auto max-w-lg px-4 py-10">
+        <h1 className="text-xl font-bold text-[var(--text)]">Confirming payment…</h1>
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          Your payment was received. Unlocking the calculator — this usually
+          takes a few seconds. Do not start another checkout.
+        </p>
       </main>
     );
   }
@@ -465,7 +596,7 @@ export default function CalculatorClient() {
           >
             History
           </Link>
-          {online && !subscribed && (
+          {online && !subscribed && !confirmingCheckout && (
             <Link
               href="/subscribe"
               className="min-h-11 content-center text-[var(--accent)]"
@@ -519,6 +650,12 @@ export default function CalculatorClient() {
           {billingError}
         </p>
       )}
+      {confirmingCheckout && (
+        <p className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-medium text-[var(--muted)]">
+          Confirming payment… Do not start another checkout.
+        </p>
+      )}
+
       <OfflineBanner
         online={online}
         pendingCount={pendingCount}

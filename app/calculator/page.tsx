@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Suspense } from "react";
 
 const CalculatorClient = dynamic(() => import("./CalculatorClient"), {
   ssr: false,
@@ -12,5 +13,15 @@ const CalculatorClient = dynamic(() => import("./CalculatorClient"), {
 });
 
 export default function CalculatorPage() {
-  return <CalculatorClient />;
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-lg px-4 py-10 text-sm text-[var(--muted)]">
+          Loading calculator…
+        </main>
+      }
+    >
+      <CalculatorClient />
+    </Suspense>
+  );
 }
