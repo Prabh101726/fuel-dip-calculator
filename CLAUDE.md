@@ -14,6 +14,7 @@ Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
 **calculator form UX (Jul 28)**, and **offline PWA / Project 2 (Jul 29)** are
 merged to `main` and **live in production**:
+https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: email/password signup with Confirm email, forgot-password /
 `/auth/reset-password`, **7-day trial** for new companies (was 14-day at

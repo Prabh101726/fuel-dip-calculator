@@ -49,12 +49,16 @@ path unchanged.
 1. Vercel Production env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
    `STRIPE_PRICE_ID=price_1TzJ6e13QgrVjwffdpj7y0nD`, `SUPABASE_SERVICE_ROLE_KEY`
    (and local `.env.local` for the two Stripe secrets)
-2. Stripe webhook → `https://fuel-dip-calculator.vercel.app/api/stripe/webhook`
-   (events: `checkout.session.completed`, `customer.subscription.*`)
+2. Stripe webhook → `https://fuel-dip-calculator.app/api/stripe/webhook`
+   (also keep or update the vercel.app URL if that endpoint is still registered)
 3. Enable Customer Portal (cancel + update payment method)
 4. Redeploy after env vars
 5. Smoke: trial driver → calculator Subscribe → `/subscribe` → Checkout;
    after pay, header shows Billing not Subscribe; trial-ended Subscribe still works
+6. Custom domain ops: Vercel SSL Valid on `fuel-dip-calculator.app`;
+   `NEXT_PUBLIC_SITE_URL=https://fuel-dip-calculator.app`; Supabase Site URL +
+   redirect allow-list for `/auth/callback` and `/auth/reset-password` on the
+   new domain
 
 ## Out of scope (still deferred)
 

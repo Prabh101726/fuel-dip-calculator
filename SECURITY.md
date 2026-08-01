@@ -7,7 +7,8 @@
 | [v0.2.0](https://github.com/Prabh101726/fuel-dip-calculator/releases/tag/v0.2.0) (soft launch) | Yes |
 | Earlier untagged builds | Best effort only |
 
-Production app: https://fuel-dip-calculator.vercel.app
+Production app: https://fuel-dip-calculator.app
+(fallback: https://fuel-dip-calculator.vercel.app)
 
 ## Reporting a vulnerability
 

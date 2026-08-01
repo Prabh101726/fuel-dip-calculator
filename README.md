@@ -5,7 +5,8 @@ delivery drivers. Pick a tank type and safe-fill % (90% or 95%), enter a dip
 reading, and get volume + safe headroom instantly. After delivery, enter the
 closing dip for delivered volume and reconciliation against the planned amount.
 
-**Live:** [fuel-dip-calculator.vercel.app](https://fuel-dip-calculator.vercel.app)
+**Live:** [fuel-dip-calculator.app](https://fuel-dip-calculator.app)
+([vercel.app](https://fuel-dip-calculator.vercel.app) still works)
 
 Built under **Detours Fleet Operations**, separate from
 [Detours](https://detours-app.com) (own repo, own users). Contact:
