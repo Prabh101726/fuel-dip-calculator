@@ -2,6 +2,7 @@
 
 import { SAFETY_REMINDER } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
+import { shouldShowBillingLink } from "@/lib/billing/shouldShowBillingLink";
 import { waitForActiveSubscription } from "@/lib/billing/waitForActiveSubscription";
 import { needsDraftHydrationAfterUnlock } from "@/lib/calculator/needsDraftHydrationAfterUnlock";
 import {
@@ -45,6 +46,9 @@ export default function CalculatorClient() {
   const [loadError, setLoadError] = useState("");
   const [trialBlocked, setTrialBlocked] = useState(false);
   const [hasBillingCustomer, setHasBillingCustomer] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
+    null,
+  );
   const [subscribed, setSubscribed] = useState(false);
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
   const [billingError, setBillingError] = useState("");
@@ -246,6 +250,7 @@ export default function CalculatorClient() {
 
       setDriverId(meta.driverId);
       setCompanyId(meta.companyId);
+      setSubscriptionStatus(meta.subscriptionStatus);
       setSubscribed(isActiveSubscriptionStatus(meta.subscriptionStatus));
       setTanks(await tanksForPaint(onlineNow));
       applyDraft(await getDraft());
@@ -304,6 +309,7 @@ export default function CalculatorClient() {
 
       if (cancelled) return false;
       setHasBillingCustomer(Boolean(driver.stripe_customer_id));
+      setSubscriptionStatus(subscriptionStatus);
       setSubscribed(isActiveSubscriptionStatus(subscriptionStatus));
       if (
         isOfflineAccessBlocked({
@@ -467,9 +473,12 @@ export default function CalculatorClient() {
           if (driver?.stripe_customer_id) {
             setHasBillingCustomer(true);
           }
-          return typeof driver?.subscription_status === "string"
-            ? driver.subscription_status
-            : null;
+          const status =
+            typeof driver?.subscription_status === "string"
+              ? driver.subscription_status
+              : null;
+          if (status) setSubscriptionStatus(status);
+          return status;
         },
         { timeoutMs: 10_000, intervalMs: 800, signal: ac.signal },
       );
@@ -478,6 +487,7 @@ export default function CalculatorClient() {
 
       if (ok) {
         setSubscribed(true);
+        setSubscriptionStatus("active");
         setTrialBlocked(false);
         const meta = await getSessionMeta();
         if (meta) {
@@ -604,7 +614,11 @@ export default function CalculatorClient() {
               Subscribe
             </Link>
           )}
-          {hasBillingCustomer && online && (
+          {online &&
+            shouldShowBillingLink({
+              hasStripeCustomer: hasBillingCustomer,
+              subscriptionStatus,
+            }) && (
             <button
               type="button"
               onClick={() => {
