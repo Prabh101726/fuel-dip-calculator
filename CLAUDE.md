@@ -12,32 +12,40 @@ Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 
 **Status:** Foundation (Jul 23), driver-facing + password auth (Jul 23),
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
-**calculator form UX (Jul 28)**, and **offline PWA / Project 2 (Jul 29)** are
-merged to `main` and **live in production**:
+**calculator form UX (Jul 28)**, **offline PWA / Project 2 (Jul 29)**,
+**direct-to-driver Stripe billing (Jul 31)**, and **soft-launch polish
+(Aug 1)** are merged to `main` and **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: email/password signup with Confirm email, forgot-password /
 `/auth/reset-password`, **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
 company/driver on first confirmed signup or sign-in, 4-tab multi-tank
-calculator with **product-grade dropdown** (tab labels show product when
-selected), **installable PWA** with used-tank chart cache, draft restore, and
-offline save queue, public `/privacy` + `/terms`, safety reminders, and flat
-history. Jul 26 also fixed a safety-critical tank-picker race (stale dip-chart
-fetch) and named operator **Detours Fleet Operations** on
-legal pages. Current soft-launch tag: **v0.2.0**. Specs:
+calculator with **product-grade dropdown** (tab labels `1. E15 Reg` /
+`2. #526` / `Tank N`), per-tab **Clear** + **Reset all tanks**,
+**installable PWA** with used-tank chart cache, draft restore, and offline
+save queue, **Stripe Checkout** `$2.99 CAD/month per driver` (early pay via
+`/subscribe` during trial; Billing portal after a real subscription status),
+public `/about` + `/guide` + `/privacy` + `/terms` (shared `SiteFooter`),
+safety reminders, and flat history. Operator: **Detours Fleet Operations**
+(`OPERATOR_NAME` in `lib/app-copy.ts`). Soft-launch tag: **v0.2.0**. Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
 `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`,
-`docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Original v1
+`docs/superpowers/specs/2026-07-29-offline-pwa-design.md`,
+`docs/superpowers/specs/2026-07-30-stripe-billing-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged twice** — magic-link trial → password auth; password is live).
 
 **Still open / next priorities:**
-- **Stripe after trial** — `$2.99 CAD/month per driver` Checkout + webhook +
-  access unlock shipped; early pay during trial via authenticated `/subscribe`
-  (calculator **Subscribe** link when not paid). Ops: confirm live webhook +
-  Customer Portal smoke; Product `prod_UzHfQGqENZ1QUU` / Price
-  `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD, lookup `fuel_dip_monthly`).
+- **Stripe ops smoke (user):** end-to-end pay → webhook updates
+  `drivers.subscription_status` → Billing portal → cancel. Confirm webhook
+  endpoint on `https://fuel-dip-calculator.app/api/stripe/webhook` and
+  `NEXT_PUBLIC_SITE_URL=https://fuel-dip-calculator.app`. Product
+  `prod_UzHfQGqENZ1QUU` / Price `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD,
+  lookup `fuel_dip_monthly`). Archive duplicate unused Stripe product if still
+  present.
+- Supabase Auth **Site URL** / redirect allow-list should include
+  `https://fuel-dip-calculator.app` (+ `/auth/callback`, `/auth/reset-password`).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **H3 ops (user):** Supabase Dashboard → Authentication → Passwords → enable
@@ -46,7 +54,7 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
   airplane mode → cached-tank calc → queued save → reconnect flush → draft
   restore after swipe-up → expired-trial offline gate.
 - Signature capture (image), history filtering, 12 flagged tanks in
-  `review_needed.json`, Sentry, mismatch-audit UI — deferred.
+  `review_needed.json`, Sentry, mismatch-audit UI, security headers — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
   (can clobber dashboard Auth URL / Confirm email settings).
 
@@ -57,9 +65,10 @@ passed Jul 29 — SQL interpolation verified against regression tanks
 #014/#015/#526):
 - **H1:** `my_trial_active()` + insert/update RLS on `dip_calculations` (SELECT
   ungated — expired trials keep read access; middleware still gates the UI).
-  Null `trial_ends_at` = active, matching middleware. **Stripe hook:** when
-  billing lands, extend `my_trial_active()` with `or subscription_active`
-  rather than adding a second policy check.
+  Null `trial_ends_at` = active, matching middleware. **Stripe (shipped):**
+  `my_trial_active()` aliases / uses `my_access_active()` — trial open **or**
+  this driver's `subscription_status` in `active`/`trialing`/`past_due`.
+  Do not add a second policy check; keep one access definition.
 - **H2:** store-both `server_*` columns + `volume_mismatch`; **BEFORE INSERT OR
   UPDATE** trigger (`recompute_dip_volumes()` → `interpolate_dip_volume()`,
   mirrors `interpolate.ts`: exact / linear / out-of-range → null, never
@@ -104,7 +113,10 @@ passed Jul 29 — SQL interpolation verified against regression tanks
 - `lib/supabase/{client,server,middleware}.ts` — browser/server Supabase
   clients + session-refresh middleware (`@supabase/ssr`).
 - `middleware.ts` — gates `/calculator` and `/history` behind an active
-  session + unexpired trial; redirects to `/login` or `/trial-ended`.
+  session + `my_access_active()` (trial **or** paid); redirects to `/login` or
+  `/trial-ended`. Allows `/calculator?checkout=success` through so the client
+  can poll while the webhook catches up. `/subscribe`, `/about`, `/guide`,
+  `/privacy`, `/terms` are public or auth-only as documented below.
 - `app/login/page.tsx` + `LoginForm.tsx` — originally email-only magic-link
   sign-in; **superseded same day, see "Auth: magic-link → password" below.**
 - `app/auth/callback/route.ts` — exchanges an auth code for a session, calls
@@ -123,9 +135,13 @@ passed Jul 29 — SQL interpolation verified against regression tanks
   already do).
 - `app/history/page.tsx` — Server Component, flat list of the driver's own
   `dip_calculations` (RLS-scoped).
-- `app/trial-ended/page.tsx` — shown when `trial_ends_at` has passed (Subscribe CTA).
+- `app/trial-ended/page.tsx` — shown when access is inactive (Subscribe CTA;
+  redirects away if already subscribed; polls on `?checkout=success`).
 - `app/subscribe/page.tsx` — auth-only early subscribe during an active trial
   (same Checkout as trial-ended); middleware skips `my_access_active` for this path.
+- `app/about/page.tsx` + `app/guide/page.tsx` — public About + User guide;
+  linked from shared `app/components/SiteFooter.tsx` (calculator, history,
+  login, trial-ended).
 - `supabase/migrations/20260723161041_trial_and_ensure_driver.sql` — adds
   `companies.trial_ends_at` and the `ensure_trial_driver()` SECURITY DEFINER
   RPC.
@@ -166,8 +182,8 @@ plan under `docs/superpowers/`.
   tank charts before delivery.
 - **Trial:** migration `20260726175154_seven_day_trial.sql` — 7-day default +
   `ensure_trial_driver()` insert; existing companies unchanged. Trial-ended
-  page mentions planned **$2.99 CAD/month** (copy only; `MONTHLY_PRICE_LABEL` in
-  `lib/app-copy.ts`).
+  page mentions **$2.99 CAD/month** (`MONTHLY_PRICE_LABEL` in
+  `lib/app-copy.ts`; Stripe Checkout is live — see Stripe billing section).
 - **Tank-chart race fix** (commit `c6c012a`): `TankSlot` keeps
   `selectedTankIdRef` and ignores stale `dip_chart_points` responses via
   `isStaleTankPointsResponse()` so a slow fetch for tank A cannot overwrite
@@ -199,10 +215,37 @@ single-tank v1 that had explicitly deferred this:
   retain/signature, save). Calculation logic
   (`calculateBeforeDelivery`/`calculateAfterDelivery`) was **not** changed.
   Still inserts one independent row per tank into `dip_calculations`.
-- **Clear button** next to Save resets only that slot (`resetSlot()`) —
-  doesn't touch the other 3 tabs.
+- **Clear button** next to Save resets only that slot (`resetSlot()` via
+  `TankSlotHandle`) — doesn't touch the other 3 tabs. Calculator also has
+  per-tab **Clear** under the tab bar and **Reset all tanks**.
+- **Clear/Reset must not resurrect the tank from boot-time draft seed** —
+  `draftTankIdentity()` + `tankCleared` in `TankSlot` (after Clear, IDB draft
+  keeps `tankTypeId`/`chartNumber` null).
 - **Save no longer redirects to `/history`.** On success, `resetSlot()` + 2.5s
   "Saved ✓" flash so the driver can continue other tanks.
+
+## Stripe billing (Jul 31 – Aug 1 2026)
+
+Direct-to-driver B2C — **not** company/fleet billing. Spec:
+`docs/superpowers/specs/2026-07-30-stripe-billing-design.md`.
+
+- Columns on **`drivers`**: `stripe_customer_id`, `subscription_status`, etc.
+- `POST /api/stripe/checkout` — Checkout `mode: subscription`; blocks already
+  subscribed (409); allowlisted `cancelPath` `/subscribe` | `/trial-ended`.
+- `POST /api/stripe/portal` — this driver's Customer Portal.
+- `POST /api/stripe/webhook` — signature required; 500 if no driver row matched
+  (Stripe retries).
+- Access: `my_access_active()` + client `isAccessActive()` /
+  `isActiveSubscriptionStatus()`.
+- **Early subscribe:** calculator **Subscribe** when online and not paid;
+  **Billing** only when `shouldShowBillingLink` (customer **and** non-null
+  `subscription_status` — abandoned Checkout creates a customer with null
+  status and must not show Billing).
+- **Post-pay hang fix:** blocked IDB paint then `refreshOnline` unlock must
+  hydrate drafts (`needsDraftHydrationAfterUnlock`); checkout return polls
+  ~10s (`waitForActiveSubscription`) before showing Subscribe again.
+- Logout clears offline session/drafts/outbox (`clearOfflineUserData`) with
+  confirm if pending saves exist.
 
 ## Calculator form UX (Jul 28 2026)
 
