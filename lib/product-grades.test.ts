@@ -17,24 +17,31 @@ describe("PRODUCT_GRADES", () => {
 });
 
 describe("tankTabLabel", () => {
-  it("prefers product grade when set", () => {
+  it("prefixes slot number with product grade when set", () => {
     expect(
       tankTabLabel({
         productGrade: "E15 Reg",
         chartNumber: "526",
         slotIndex: 0,
       }),
-    ).toBe("E15 Reg");
+    ).toBe("1. E15 Reg");
+    expect(
+      tankTabLabel({
+        productGrade: "P93",
+        chartNumber: null,
+        slotIndex: 2,
+      }),
+    ).toBe("3. P93");
   });
 
-  it("falls back to chart number when no product", () => {
+  it("prefixes slot number with chart when no product", () => {
     expect(
       tankTabLabel({
         productGrade: "",
         chartNumber: "526",
         slotIndex: 0,
       }),
-    ).toBe("#526");
+    ).toBe("1. #526");
   });
 
   it("falls back to Tank N when nothing selected", () => {

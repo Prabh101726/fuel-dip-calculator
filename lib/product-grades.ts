@@ -16,8 +16,9 @@ export function tankTabLabel(opts: {
   chartNumber: string | null | undefined;
   slotIndex: number;
 }): string {
+  const n = opts.slotIndex + 1;
   const product = opts.productGrade?.trim() ?? "";
-  if (product !== "") return product;
-  if (opts.chartNumber) return `#${opts.chartNumber}`;
-  return `Tank ${opts.slotIndex + 1}`;
+  if (product !== "") return `${n}. ${product}`;
+  if (opts.chartNumber) return `${n}. #${opts.chartNumber}`;
+  return `Tank ${n}`;
 }

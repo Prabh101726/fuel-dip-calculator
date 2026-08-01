@@ -36,6 +36,8 @@ export async function updateSession(request: NextRequest) {
     path === "/trial-ended" ||
     path === "/privacy" ||
     path === "/terms" ||
+    path === "/about" ||
+    path === "/guide" ||
     path === "/api/stripe/webhook";
   // Auth required, but not gated on my_access_active (early subscribe during trial).
   const isAuthOnly = path === "/subscribe";

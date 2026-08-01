@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import InstallHint from "./InstallHint";
 import OfflineBanner from "./OfflineBanner";
 import TankSlot, { type TankSlotHandle, type TankType } from "./TankSlot";
+import SiteFooter from "@/app/components/SiteFooter";
 
 const SLOT_COUNT = 4;
 const DRAFT_DEBOUNCE_MS = 400;
@@ -763,14 +764,7 @@ export default function CalculatorClient() {
         ))
       )}
 
-      <footer className="mt-10 flex gap-4 text-xs font-bold text-[var(--muted)]">
-        <Link href="/privacy" className="min-h-11 content-center hover:text-[var(--accent)]">
-          Privacy
-        </Link>
-        <Link href="/terms" className="min-h-11 content-center hover:text-[var(--accent)]">
-          Terms
-        </Link>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

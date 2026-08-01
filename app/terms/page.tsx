@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
+import {
+  CONTACT_EMAIL,
+  MONTHLY_PRICE_LABEL,
+  OPERATOR_NAME,
+  TRIAL_DAYS,
+} from "@/lib/app-copy";
 
 export default function TermsPage() {
   return (
@@ -11,8 +16,7 @@ export default function TermsPage() {
         Terms of Use
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Operated by SRV Freight Inc and Detours Fleet Operations. Last
-        updated: July 26, 2026.
+        Operated by {OPERATOR_NAME}. Last updated: August 1, 2026.
       </p>
 
       <div className="mt-8 space-y-6 text-sm leading-relaxed text-[var(--text)]">
@@ -59,8 +63,7 @@ export default function TermsPage() {
           <h2 className="text-base font-bold">Limitation of liability</h2>
           <p className="text-[var(--muted)]">
             The service is provided as-is for operational assistance. To the
-            fullest extent permitted by law, SRV Freight Inc and Detours Fleet
-            Operations are not liable for
+            fullest extent permitted by law, {OPERATOR_NAME} is not liable for
             spills, overfills, delivery errors, or other damages arising from
             reliance on the calculator. Use verified tank tags and site
             procedures.

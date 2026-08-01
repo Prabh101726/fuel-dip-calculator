@@ -7,7 +7,7 @@ closing dip for delivered volume and reconciliation against the planned amount.
 
 **Live:** [fuel-dip-calculator.vercel.app](https://fuel-dip-calculator.vercel.app)
 
-Built under **SRV Freight Inc** / **Detours Fleet Operations**, separate from
+Built under **Detours Fleet Operations**, separate from
 [Detours](https://detours-app.com) (own repo, own users). Contact:
 [contact@detours-app.com](mailto:contact@detours-app.com).
 

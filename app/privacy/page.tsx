@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CONTACT_EMAIL } from "@/lib/app-copy";
+import { CONTACT_EMAIL, OPERATOR_NAME } from "@/lib/app-copy";
 
 export default function PrivacyPage() {
   return (
@@ -11,8 +11,7 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Operated by SRV Freight Inc and Detours Fleet Operations. Last
-        updated: July 26, 2026.
+        Operated by {OPERATOR_NAME}. Last updated: August 1, 2026.
       </p>
 
       <div className="mt-8 space-y-6 text-sm leading-relaxed text-[var(--text)]">

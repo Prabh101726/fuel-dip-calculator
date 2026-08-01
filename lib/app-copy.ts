@@ -1,5 +1,8 @@
 export const CONTACT_EMAIL = "contact@detours-app.com";
 
+/** Public operator name shown on legal and about pages. */
+export const OPERATOR_NAME = "Detours Fleet Operations";
+
 export const SAFETY_REMINDER =
   "Safety first: always verify the physical tank tag matches the chart number and given site plan Tank charts before delivery.";
 

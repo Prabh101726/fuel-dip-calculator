@@ -50,4 +50,4 @@ These are intentional or deferred — not considered resolved:
 
 ## Operators
 
-Operated by **SRV Freight Inc** and **Detours Fleet Operations**.
+Operated by **Detours Fleet Operations**.

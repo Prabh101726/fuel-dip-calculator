@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import SiteFooter from "@/app/components/SiteFooter";
 import {
   SAFETY_REMINDER,
   TRIAL_DAYS,
@@ -274,14 +275,10 @@ export default function LoginForm() {
         </p>
       )}
 
-      <footer className="mt-8 flex justify-center gap-4 text-sm text-[var(--muted)]">
-        <Link href="/privacy" className="font-bold text-[var(--accent)]">
-          Privacy Policy
-        </Link>
-        <Link href="/terms" className="font-bold text-[var(--accent)]">
-          Terms of Use
-        </Link>
-      </footer>
+      <SiteFooter
+        className="mt-8 flex flex-wrap justify-center gap-4 text-sm text-[var(--muted)]"
+        linkClassName="font-bold text-[var(--accent)]"
+      />
     </main>
   );
 }

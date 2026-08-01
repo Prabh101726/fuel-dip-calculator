@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import SiteFooter from "@/app/components/SiteFooter";
 import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import { startCheckout } from "@/lib/billing/startCheckout";
@@ -183,14 +183,7 @@ function TrialEndedInner() {
       >
         Log out
       </button>
-      <footer className="mt-10 flex gap-4 text-xs font-bold text-[var(--muted)]">
-        <Link href="/privacy" className="min-h-11 content-center hover:text-[var(--accent)]">
-          Privacy
-        </Link>
-        <Link href="/terms" className="min-h-11 content-center hover:text-[var(--accent)]">
-          Terms
-        </Link>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

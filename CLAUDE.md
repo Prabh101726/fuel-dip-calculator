@@ -1,6 +1,7 @@
 # Fuel Dip Calculator — Agent Guide
 
-Second product under SRV Freight Inc, separate from Detours (own repo, own users).
+Second product under Detours Fleet Operations, separate from Detours (own repo,
+own users).
 Replaces a paper "Safe Discharge Sheet" + a 327-page dip-chart PDF that fuel
 delivery drivers currently do by hand: pick a tank type + safe-fill %, enter a dip
 reading, get volume + safe headroom instantly; after delivery, enter the closing
@@ -22,7 +23,7 @@ calculator with **product-grade dropdown** (tab labels show product when
 selected), **installable PWA** with used-tank chart cache, draft restore, and
 offline save queue, public `/privacy` + `/terms`, safety reminders, and flat
 history. Jul 26 also fixed a safety-critical tank-picker race (stale dip-chart
-fetch) and named operators **SRV Freight Inc and Detours Fleet Operations** on
+fetch) and named operator **Detours Fleet Operations** on
 legal pages. Current soft-launch tag: **v0.2.0**. Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
 `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`,
@@ -157,7 +158,7 @@ plan under `docs/superpowers/`.
   route recovery through `/auth/callback` (trial gate would bounce expired
   trials before they can reset).
 - **Legal:** public `/privacy` + `/terms`; signup checkbox required. Operator
-  copy: **SRV Freight Inc and Detours Fleet Operations**. Contact:
+  copy: **Detours Fleet Operations**. Contact:
   **`contact@detours-app.com`** (`CONTACT_EMAIL` in `lib/app-copy.ts`).
 - **Safety reminder** (`SAFETY_REMINDER` in `lib/app-copy.ts`) on login +
   calculator: verify physical tank tag matches chart number **and** site-plan
@@ -188,7 +189,8 @@ single-tank v1 that had explicitly deferred this:
   tab-switching to conditionally mount/unmount, it would silently wipe a
   driver's in-progress entry on another tab.
 - **Tab labels** (Jul 28): product grade if set → else `#chart` if tank picked
-  → else `Tank N`. Uses `tankTabLabel()` in `lib/product-grades.ts`. Slots
+  → else `Tank N`. Uses `tankTabLabel()` in `lib/product-grades.ts` — product /
+  chart labels are prefixed with slot number (`1. E15 Reg`, `2. #526`). Slots
   report chart via `onSelectedChartChange` and product via
   `onSelectedProductChange`.
 - `app/calculator/TankSlot.tsx` — per-tank form (tank picker, safe-fill %,
