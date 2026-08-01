@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SAFETY_REMINDER } from "@/lib/app-copy";
+import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import {
   blankSlotDraft,
   getDraft,
@@ -25,7 +26,7 @@ import { tankTabLabel } from "@/lib/product-grades";
 import { createClient } from "@/lib/supabase/client";
 import InstallHint from "./InstallHint";
 import OfflineBanner from "./OfflineBanner";
-import TankSlot, { type TankType } from "./TankSlot";
+import TankSlot, { type TankSlotHandle, type TankType } from "./TankSlot";
 
 const SLOT_COUNT = 4;
 const DRAFT_DEBOUNCE_MS = 400;
@@ -40,6 +41,7 @@ export default function CalculatorClient() {
   const [loadError, setLoadError] = useState("");
   const [trialBlocked, setTrialBlocked] = useState(false);
   const [hasBillingCustomer, setHasBillingCustomer] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -62,6 +64,19 @@ export default function CalculatorClient() {
   );
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeTabRef = useRef(0);
+  const slotRefs = useRef<(TankSlotHandle | null)[]>(
+    Array.from({ length: SLOT_COUNT }, () => null),
+  );
+
+  const clearSlot = useCallback((index: number) => {
+    slotRefs.current[index]?.reset();
+  }, []);
+
+  const clearAllSlots = useCallback(() => {
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      slotRefs.current[i]?.reset();
+    }
+  }, []);
 
   const chartSetters = useMemo(
     () =>
@@ -225,6 +240,7 @@ export default function CalculatorClient() {
 
       setDriverId(meta.driverId);
       setCompanyId(meta.companyId);
+      setSubscribed(isActiveSubscriptionStatus(meta.subscriptionStatus));
       setTanks(await tanksForPaint(onlineNow));
       applyDraft(await getDraft());
       await refreshOutboxCounts();
@@ -282,6 +298,7 @@ export default function CalculatorClient() {
 
       if (cancelled) return false;
       setHasBillingCustomer(Boolean(driver.stripe_customer_id));
+      setSubscribed(isActiveSubscriptionStatus(subscriptionStatus));
       if (
         isOfflineAccessBlocked({
           trialEndsAt: trial,
@@ -441,6 +458,14 @@ export default function CalculatorClient() {
           >
             History
           </Link>
+          {online && !subscribed && (
+            <Link
+              href="/subscribe"
+              className="min-h-11 content-center text-[var(--accent)]"
+            >
+              Subscribe
+            </Link>
+          )}
           {hasBillingCustomer && online && (
             <button
               type="button"
@@ -485,7 +510,7 @@ export default function CalculatorClient() {
         </p>
       )}
 
-      <div className="mb-4 grid grid-cols-4 gap-2">
+      <div className="mb-2 grid grid-cols-4 gap-2">
         {Array.from({ length: SLOT_COUNT }, (_, index) => {
           const label = tankTabLabel({
             productGrade: tabProducts[index],
@@ -509,6 +534,29 @@ export default function CalculatorClient() {
           );
         })}
       </div>
+      <div className="mb-2 grid grid-cols-4 gap-2">
+        {Array.from({ length: SLOT_COUNT }, (_, index) => (
+          <button
+            key={index}
+            type="button"
+            disabled={!ready}
+            onClick={() => clearSlot(index)}
+            className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--card)] text-xs font-bold text-[var(--muted)] disabled:opacity-50"
+          >
+            Clear
+          </button>
+        ))}
+      </div>
+      <div className="mb-4">
+        <button
+          type="button"
+          disabled={!ready}
+          onClick={clearAllSlots}
+          className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm font-bold text-[var(--text)] disabled:opacity-50"
+        >
+          Reset all tanks
+        </button>
+      </div>
 
       {!ready ? (
         <p className="text-sm text-[var(--muted)]">Loading…</p>
@@ -520,6 +568,9 @@ export default function CalculatorClient() {
             aria-hidden={activeTab !== index}
           >
             <TankSlot
+              ref={(handle) => {
+                slotRefs.current[index] = handle;
+              }}
               tanks={tanks}
               driverId={driverId}
               companyId={companyId}

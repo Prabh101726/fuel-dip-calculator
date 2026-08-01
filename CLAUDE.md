@@ -32,10 +32,10 @@ design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 
 **Still open / next priorities:**
 - **Stripe after trial** — `$2.99 CAD/month per driver` Checkout + webhook +
-  access unlock shipped in code; ops still need live `STRIPE_SECRET_KEY`,
-  `STRIPE_WEBHOOK_SECRET`, Customer Portal enable, and webhook endpoint on
-  Vercel. Product `prod_UzHfQGqENZ1QUU` / Price `price_1TzJ6e13QgrVjwffdpj7y0nD`
-  (CAD, lookup `fuel_dip_monthly`).
+  access unlock shipped; early pay during trial via authenticated `/subscribe`
+  (calculator **Subscribe** link when not paid). Ops: confirm live webhook +
+  Customer Portal smoke; Product `prod_UzHfQGqENZ1QUU` / Price
+  `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD, lookup `fuel_dip_monthly`).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **H3 ops (user):** Supabase Dashboard → Authentication → Passwords → enable
@@ -121,7 +121,9 @@ passed Jul 29 — SQL interpolation verified against regression tanks
   already do).
 - `app/history/page.tsx` — Server Component, flat list of the driver's own
   `dip_calculations` (RLS-scoped).
-- `app/trial-ended/page.tsx` — shown when `trial_ends_at` has passed.
+- `app/trial-ended/page.tsx` — shown when `trial_ends_at` has passed (Subscribe CTA).
+- `app/subscribe/page.tsx` — auth-only early subscribe during an active trial
+  (same Checkout as trial-ended); middleware skips `my_access_active` for this path.
 - `supabase/migrations/20260723161041_trial_and_ensure_driver.sql` — adds
   `companies.trial_ends_at` and the `ensure_trial_driver()` SECURITY DEFINER
   RPC.

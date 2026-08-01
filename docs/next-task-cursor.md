@@ -42,6 +42,10 @@ Product/Price already live:
 - Product `prod_UzHfQGqENZ1QUU`
 - Price `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD $2.99/mo, lookup `fuel_dip_monthly`)
 
+**Early subscribe (shipped in app):** authenticated `/subscribe` + calculator
+**Subscribe** link while trial is active and driver is not paid; `/trial-ended`
+path unchanged.
+
 1. Vercel Production env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
    `STRIPE_PRICE_ID=price_1TzJ6e13QgrVjwffdpj7y0nD`, `SUPABASE_SERVICE_ROLE_KEY`
    (and local `.env.local` for the two Stripe secrets)
@@ -49,6 +53,8 @@ Product/Price already live:
    (events: `checkout.session.completed`, `customer.subscription.*`)
 3. Enable Customer Portal (cancel + update payment method)
 4. Redeploy after env vars
+5. Smoke: trial driver → calculator Subscribe → `/subscribe` → Checkout;
+   after pay, header shows Billing not Subscribe; trial-ended Subscribe still works
 
 ## Out of scope (still deferred)
 

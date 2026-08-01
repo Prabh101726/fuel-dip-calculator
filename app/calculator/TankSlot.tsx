@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateAfterDelivery,
@@ -34,6 +42,10 @@ export type TankType = {
   chart_number: string;
   manufacturer: string;
   capacity_liters: number;
+};
+
+export type TankSlotHandle = {
+  reset: () => void;
 };
 
 type Props = {
@@ -107,17 +119,20 @@ function tryAfter(
   }
 }
 
-export default function TankSlot({
-  tanks,
-  driverId,
-  companyId,
-  supabase,
-  initialDraft,
-  onDraftChange,
-  onOutboxChange,
-  onSelectedChartChange,
-  onSelectedProductChange,
-}: Props) {
+const TankSlot = forwardRef<TankSlotHandle, Props>(function TankSlot(
+  {
+    tanks,
+    driverId,
+    companyId,
+    supabase,
+    initialDraft,
+    onDraftChange,
+    onOutboxChange,
+    onSelectedChartChange,
+    onSelectedProductChange,
+  },
+  ref,
+) {
   const seed = initialDraft ?? blankSlotDraft();
   const [tankQuery, setTankQuery] = useState("");
   const [selectedTank, setSelectedTank] = useState<TankType | null>(null);
@@ -188,6 +203,8 @@ export default function TankSlot({
     onSelectedProductChange(null);
     onDraftChange?.(blankSlotDraft());
   }
+
+  useImperativeHandle(ref, () => ({ reset: resetSlot }));
 
   async function selectTank(tank: TankType) {
     selectedTankIdRef.current = tank.id;
@@ -774,7 +791,9 @@ export default function TankSlot({
       </div>
     </div>
   );
-}
+});
+
+export default TankSlot;
 
 function Field({
   label,

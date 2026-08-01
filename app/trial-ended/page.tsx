@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
+import { startCheckout } from "@/lib/billing/startCheckout";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TrialEndedPage() {
@@ -22,16 +23,14 @@ export default function TrialEndedPage() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch("/api/stripe/checkout", { method: "POST" });
-      const body = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !body.url) {
-        setError(body.error || "Could not start checkout. Try again.");
-        setBusy(false);
-        return;
-      }
-      window.location.href = body.url;
-    } catch {
-      setError("Could not start checkout. Check your connection.");
+      const url = await startCheckout();
+      window.location.href = url;
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not start checkout. Check your connection.",
+      );
       setBusy(false);
     }
   }

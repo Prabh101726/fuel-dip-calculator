@@ -37,10 +37,15 @@ export async function updateSession(request: NextRequest) {
     path === "/privacy" ||
     path === "/terms" ||
     path === "/api/stripe/webhook";
+  // Auth required, but not gated on my_access_active (early subscribe during trial).
+  const isAuthOnly = path === "/subscribe";
 
   if (!user && !isPublic && path !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    if (isAuthOnly) {
+      url.searchParams.set("next", path);
+    }
     return NextResponse.redirect(url);
   }
 
@@ -56,6 +61,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // /subscribe: signed-in users only; skip access gate so trial drivers can pay early.
   if (user && (path === "/calculator" || path === "/history" || path === "/")) {
     const { data: accessActive, error } = await supabase.rpc("my_access_active");
     if (error || accessActive !== true) {
