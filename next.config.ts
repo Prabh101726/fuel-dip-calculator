@@ -1,10 +1,18 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 
 const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
   crypto.randomUUID();
+
+const packageVersion = (
+  JSON.parse(readFileSync(join(__dirname, "package.json"), "utf-8")) as {
+    version: string;
+  }
+).version;
 
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
@@ -18,6 +26,10 @@ const withSerwist = withSerwistInit({
   additionalPrecacheEntries: [{ url: "/~offline", revision }],
 });
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageVersion,
+  },
+};
 
 export default withSerwist(nextConfig);

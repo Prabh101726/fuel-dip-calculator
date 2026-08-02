@@ -276,8 +276,10 @@ export default function LoginForm() {
       )}
 
       <SiteFooter
-        className="mt-8 flex flex-wrap justify-center gap-4 text-sm text-[var(--muted)]"
+        className="mt-8 flex flex-col items-center gap-3"
+        linksClassName="flex flex-wrap justify-center gap-4 text-sm text-[var(--muted)]"
         linkClassName="font-bold text-[var(--accent)]"
+        versionClassName="text-xs font-medium text-[var(--muted)]"
       />
     </main>
   );
