@@ -165,14 +165,49 @@ export default function CalculatorClient() {
     scheduleDraftPersist();
   }, [activeTab, scheduleDraftPersist]);
 
+  // Re-read billing when returning online/focus so webhook backfills show up
+  // without requiring logout (Subscribe → Billing / Plan active).
+  const refreshBillingFromServer = useCallback(async () => {
+    if (!isBrowserOnline()) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: driver } = await supabase
+      .from("drivers")
+      .select("stripe_customer_id, subscription_status")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!driver) return;
+    const status =
+      typeof driver.subscription_status === "string"
+        ? driver.subscription_status
+        : null;
+    setHasBillingCustomer(Boolean(driver.stripe_customer_id));
+    setSubscriptionStatus(status);
+    setSubscribed(isActiveSubscriptionStatus(status));
+    const meta = await getSessionMeta();
+    if (meta) {
+      await putSessionMeta({
+        ...meta,
+        subscriptionStatus: status,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }, [supabase]);
+
   useEffect(() => {
     const onOnline = () => {
       setOnline(true);
       void runFlush();
+      void refreshBillingFromServer();
     };
     const onOffline = () => setOnline(false);
     const onFocus = () => {
-      if (isBrowserOnline()) void runFlush();
+      if (isBrowserOnline()) {
+        void runFlush();
+        void refreshBillingFromServer();
+      }
     };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
@@ -182,7 +217,7 @@ export default function CalculatorClient() {
       window.removeEventListener("offline", onOffline);
       window.removeEventListener("focus", onFocus);
     };
-  }, [runFlush]);
+  }, [runFlush, refreshBillingFromServer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,7 +287,12 @@ export default function CalculatorClient() {
       setDriverId(meta.driverId);
       setCompanyId(meta.companyId);
       setSubscriptionStatus(meta.subscriptionStatus);
-      setSubscribed(isActiveSubscriptionStatus(meta.subscriptionStatus));
+      const cachedSubscribed = isActiveSubscriptionStatus(
+        meta.subscriptionStatus,
+      );
+      setSubscribed(cachedSubscribed);
+      // Paid plan in IDB → show Billing immediately (flag may lag until refresh).
+      if (cachedSubscribed) setHasBillingCustomer(true);
       setTanks(await tanksForPaint(onlineNow));
       applyDraft(await getDraft());
       await refreshOutboxCounts();
@@ -607,6 +647,11 @@ export default function CalculatorClient() {
           >
             History
           </Link>
+          {online && subscribed && (
+            <span className="min-h-11 content-center text-sm font-bold text-[var(--success)]">
+              Plan active
+            </span>
+          )}
           {online && !subscribed && !confirmingCheckout && (
             <Link
               href="/subscribe"

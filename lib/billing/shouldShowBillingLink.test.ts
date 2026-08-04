@@ -29,11 +29,20 @@ describe("shouldShowBillingLink", () => {
     ).toBe(true);
   });
 
-  it("hides Billing with no customer", () => {
+  it("shows Billing when status is active even if customer flag lagged", () => {
     expect(
       shouldShowBillingLink({
         hasStripeCustomer: false,
         subscriptionStatus: "active",
+      }),
+    ).toBe(true);
+  });
+
+  it("hides Billing with no customer and no status", () => {
+    expect(
+      shouldShowBillingLink({
+        hasStripeCustomer: false,
+        subscriptionStatus: null,
       }),
     ).toBe(false);
   });
