@@ -55,7 +55,8 @@ export async function POST(request: Request) {
   let customerId = driver.stripe_customer_id as string | null;
   if (!customerId) {
     const customer = await stripe.customers.create({
-      email: user.email ?? undefined,
+      email: user.email || undefined,
+      phone: user.phone || undefined,
       metadata: { driver_id: driver.id },
     });
     customerId = customer.id;

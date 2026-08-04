@@ -1,43 +1,52 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SiteFooter from "@/app/components/SiteFooter";
 import {
   SAFETY_REMINDER,
   TRIAL_DAYS,
-  authCallbackUrl,
   resetPasswordUrl,
 } from "@/lib/app-copy";
+import { mapOtpThrottleError } from "@/lib/auth/otpThrottle";
 import { safePostAuthNext } from "@/lib/auth/safeNextPath";
+import { formatNanpDisplay, toNanpE164 } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/client";
 
-type Mode = "signin" | "signup";
+type Path = "phone" | "verify" | "email" | "forgot";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [path, setPath] = useState<Path>("phone");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
-  const [forgotMode, setForgotMode] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const urlError = useMemo(() => {
     const err = searchParams.get("error");
     const code = searchParams.get("error_code");
     if (code === "otp_expired" || err === "access_denied") {
-      return "That email link expired. Sign in with your email and password instead.";
+      return "That email link expired. Sign in with phone, or use email and password if you have an existing account.";
     }
     if (err === "auth") {
-      return "Sign-in failed. Try again with email and password.";
+      return "Sign-in failed. Try again.";
     }
     return "";
   }, [searchParams]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
 
   async function afterAuth() {
     const supabase = createClient();
@@ -45,7 +54,6 @@ export default function LoginForm() {
     const { data: accessActive, error } = await supabase.rpc("my_access_active");
     const next = safePostAuthNext(searchParams.get("next"));
     if (error || accessActive !== true) {
-      // Expired trial: allow /subscribe so they can pay; otherwise lock screen.
       router.replace(next === "/subscribe" ? "/subscribe" : "/trial-ended");
       router.refresh();
       return;
@@ -54,7 +62,137 @@ export default function LoginForm() {
     router.refresh();
   }
 
-  async function onSubmit(e: FormEvent) {
+  async function requestThrottle(e164: string): Promise<boolean> {
+    const supabase = createClient();
+    const { error } = await supabase.rpc("request_otp_throttle", {
+      p_phone: e164,
+    });
+    const mapped = mapOtpThrottleError(
+      error
+        ? {
+            code: error.code,
+            message: error.message,
+            hint: error.hint,
+          }
+        : null,
+    );
+    if (!mapped.ok) {
+      setIsError(true);
+      setMessage(mapped.message);
+      return false;
+    }
+    return true;
+  }
+
+  async function sendOtp(e164: string) {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: e164,
+      options: { shouldCreateUser: true },
+    });
+    if (error) {
+      setIsError(true);
+      setMessage(error.message || "Could not send verification code.");
+      return false;
+    }
+    return true;
+  }
+
+  async function onSendCode(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMessage("");
+    setIsError(false);
+
+    const e164 = toNanpE164(phone);
+    if (!e164) {
+      setBusy(false);
+      setIsError(true);
+      setMessage("Enter a valid Canada / US mobile number.");
+      return;
+    }
+    if (!acceptedLegal) {
+      setBusy(false);
+      setIsError(true);
+      setMessage("Please agree to the Terms of Use and Privacy Policy.");
+      return;
+    }
+
+    const allowed = await requestThrottle(e164);
+    if (!allowed) {
+      setBusy(false);
+      return;
+    }
+
+    const ok = await sendOtp(e164);
+    setBusy(false);
+    if (!ok) return;
+
+    setPhone(e164);
+    setOtp("");
+    setResendCooldown(60);
+    setPath("verify");
+    setIsError(false);
+    setMessage(`Code sent to ${formatNanpDisplay(e164)}.`);
+  }
+
+  async function onVerify(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMessage("");
+    setIsError(false);
+
+    const e164 = toNanpE164(phone);
+    const token = otp.replace(/\D/g, "").slice(0, 6);
+    if (!e164 || token.length < 6) {
+      setBusy(false);
+      setIsError(true);
+      setMessage("Enter the 6-digit code from your text message.");
+      return;
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      phone: e164,
+      token,
+      type: "sms",
+    });
+    if (error) {
+      setBusy(false);
+      setIsError(true);
+      setMessage(error.message || "Invalid or expired code.");
+      return;
+    }
+    await afterAuth();
+  }
+
+  async function onResend() {
+    if (resendCooldown > 0 || busy) return;
+    setBusy(true);
+    setMessage("");
+    setIsError(false);
+    const e164 = toNanpE164(phone);
+    if (!e164) {
+      setBusy(false);
+      setIsError(true);
+      setMessage("Enter a valid Canada / US mobile number.");
+      return;
+    }
+    const allowed = await requestThrottle(e164);
+    if (!allowed) {
+      setBusy(false);
+      return;
+    }
+    const ok = await sendOtp(e164);
+    setBusy(false);
+    if (!ok) return;
+    setResendCooldown(60);
+    setOtp("");
+    setIsError(false);
+    setMessage("New code sent.");
+  }
+
+  async function onEmailSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setMessage("");
@@ -63,7 +201,7 @@ export default function LoginForm() {
     const supabase = createClient();
     const trimmed = email.trim();
 
-    if (forgotMode) {
+    if (path === "forgot") {
       const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
         redirectTo: resetPasswordUrl(window.location.origin),
       });
@@ -78,53 +216,34 @@ export default function LoginForm() {
       return;
     }
 
-    if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: trimmed,
-        password,
-      });
-      if (error) {
-        setBusy(false);
-        setIsError(true);
-        setMessage(error.message || "Could not sign in.");
-        return;
-      }
-      await afterAuth();
-      return;
-    }
-
-    if (!acceptedLegal) {
-      setBusy(false);
-      setIsError(true);
-      setMessage("Please agree to the Terms of Use and Privacy Policy.");
-      return;
-    }
-
-    const origin = window.location.origin;
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: trimmed,
       password,
-      options: {
-        emailRedirectTo: authCallbackUrl(origin),
-      },
     });
     if (error) {
       setBusy(false);
       setIsError(true);
-      setMessage(error.message || "Could not create account.");
+      setMessage(error.message || "Could not sign in.");
       return;
     }
-
-    if (!data.session) {
-      setBusy(false);
-      setIsError(false);
-      setMessage("Account created. Check your email to confirm, then sign in.");
-      setMode("signin");
-      return;
-    }
-
     await afterAuth();
   }
+
+  const title =
+    path === "verify"
+      ? "Enter code"
+      : path === "email"
+        ? "Email sign in"
+        : path === "forgot"
+          ? "Reset password"
+          : "Sign in";
+
+  const subtitle =
+    path === "verify"
+      ? `We texted a 6-digit code to ${formatNanpDisplay(phone)}.`
+      : path === "email" || path === "forgot"
+        ? "For existing email accounts only. New drivers use phone."
+        : `Canada / US mobile. First sign-in starts a ${TRIAL_DAYS}-day trial.`;
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-4 py-12">
@@ -132,142 +251,222 @@ export default function LoginForm() {
         Fuel Dip Calculator
       </p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--text)]">
-        {forgotMode
-          ? "Reset password"
-          : mode === "signin"
-            ? "Sign in"
-            : "Start free trial"}
+        {title}
       </h1>
-      <p className="mt-2 text-sm text-[var(--muted)]">
-        Email and password. First sign-up starts a {TRIAL_DAYS}-day trial.
-      </p>
+      <p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p>
       <p className="mt-4 rounded-lg border border-[var(--warn)] bg-[var(--warn-bg)] px-3 py-2.5 text-sm font-medium text-[var(--warn-fg)]">
         {SAFETY_REMINDER}
       </p>
 
-      {!forgotMode && <div className="mt-6 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("signin");
-            setForgotMode(false);
-            setMessage("");
-          }}
-          className={`min-h-11 flex-1 rounded-lg border text-sm font-bold ${
-            mode === "signin"
-              ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
-              : "border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
-          }`}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("signup");
-            setForgotMode(false);
-            setMessage("");
-          }}
-          className={`min-h-11 flex-1 rounded-lg border text-sm font-bold ${
-            mode === "signup"
-              ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
-              : "border-[var(--border)] bg-[var(--card)] text-[var(--text)]"
-          }`}
-        >
-          Create account
-        </button>
-      </div>}
+      {(path === "phone" || path === "verify") && (
+        <>
+          {path === "phone" ? (
+            <form onSubmit={onSendCode} className="mt-6 flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+                  Mobile number
+                </span>
+                <input
+                  type="tel"
+                  required
+                  autoComplete="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                  placeholder="(416) 555-0100"
+                />
+                <span className="text-xs text-[var(--muted)]">
+                  Canada / US (+1). We’ll text a one-time code.
+                </span>
+              </label>
 
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-            Email
-          </span>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
-            placeholder="you@company.com"
-          />
-        </label>
+              <label className="flex items-start gap-3 text-sm text-[var(--muted)]">
+                <input
+                  type="checkbox"
+                  checked={acceptedLegal}
+                  onChange={(e) => setAcceptedLegal(e.target.checked)}
+                  className="mt-1"
+                  required
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link href="/terms" className="font-bold text-[var(--accent)]">
+                    Terms of Use
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    className="font-bold text-[var(--accent)]"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
 
-        {!forgotMode && (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-              Password
-            </span>
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
-              placeholder="At least 6 characters"
-            />
-          </label>
-        )}
+              <button
+                type="submit"
+                disabled={busy}
+                className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
+              >
+                {busy ? "Sending…" : "Send verification code"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={onVerify} className="mt-6 flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+                  Verification code
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) =>
+                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-center text-2xl tracking-[0.35em] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                  placeholder="••••••"
+                />
+              </label>
 
-        {mode === "signup" && !forgotMode && (
-          <label className="flex items-start gap-3 text-sm text-[var(--muted)]">
-            <input
-              type="checkbox"
-              checked={acceptedLegal}
-              onChange={(e) => setAcceptedLegal(e.target.checked)}
-              className="mt-1"
-              required
-            />
-            <span>
-              I agree to the{" "}
-              <Link href="/terms" className="font-bold text-[var(--accent)]">
-                Terms of Use
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="font-bold text-[var(--accent)]">
-                Privacy Policy
-              </Link>
-              .
-            </span>
-          </label>
-        )}
+              <button
+                type="submit"
+                disabled={busy || otp.length < 6}
+                className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
+              >
+                {busy ? "Checking…" : "Verify & continue"}
+              </button>
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
-        >
-          {busy
-            ? "Working…"
-            : forgotMode
-              ? "Send reset link"
-              : mode === "signin"
-              ? "Sign in"
-              : "Create account & start trial"}
-        </button>
-      </form>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPath("phone");
+                    setOtp("");
+                    setMessage("");
+                    setIsError(false);
+                  }}
+                  className="font-bold text-[var(--accent)]"
+                >
+                  Change number
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || resendCooldown > 0}
+                  onClick={() => void onResend()}
+                  className="font-bold text-[var(--accent)] disabled:opacity-50"
+                >
+                  {resendCooldown > 0
+                    ? `Resend in ${resendCooldown}s`
+                    : "Resend code"}
+                </button>
+              </div>
+            </form>
+          )}
 
-      {mode === "signin" && (
-        <button
-          type="button"
-          onClick={() => {
-            setForgotMode(!forgotMode);
-            setMessage("");
-            setIsError(false);
-          }}
-          className="mt-4 text-sm font-bold text-[var(--accent)]"
-        >
-          {forgotMode ? "Back to sign in" : "Forgot password?"}
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPath("email");
+              setMessage("");
+              setIsError(false);
+            }}
+            className="mt-6 text-sm font-bold text-[var(--muted)] underline-offset-2 hover:text-[var(--accent)] hover:underline"
+          >
+            Have an existing email account? Sign in with email
+          </button>
+        </>
+      )}
+
+      {(path === "email" || path === "forgot") && (
+        <>
+          <form onSubmit={onEmailSubmit} className="mt-6 flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+                Email
+              </span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                placeholder="you@company.com"
+              />
+            </label>
+
+            {path === "email" && (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+                  Password
+                </span>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                  placeholder="Your password"
+                />
+              </label>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
+            >
+              {busy
+                ? "Working…"
+                : path === "forgot"
+                  ? "Send reset link"
+                  : "Sign in with email"}
+            </button>
+          </form>
+
+          <div className="mt-4 flex flex-col gap-2 text-sm">
+            {path === "email" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPath("forgot");
+                  setMessage("");
+                  setIsError(false);
+                }}
+                className="font-bold text-[var(--accent)]"
+              >
+                Forgot password?
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setPath(path === "forgot" ? "email" : "phone");
+                setMessage("");
+                setIsError(false);
+              }}
+              className="font-bold text-[var(--accent)]"
+            >
+              {path === "forgot" ? "Back to email sign in" : "Back to phone sign in"}
+            </button>
+          </div>
+        </>
       )}
 
       {(urlError !== "" || message !== "") && (
         <p
           className={`mt-4 text-sm font-medium ${
-            isError || urlError !== "" ? "text-[var(--danger)]" : "text-[var(--success)]"
+            isError || urlError !== ""
+              ? "text-[var(--danger)]"
+              : "text-[var(--success)]"
           }`}
           role="status"
         >

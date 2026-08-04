@@ -11,18 +11,20 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Operated by {OPERATOR_NAME}. Last updated: August 1, 2026.
+        Operated by {OPERATOR_NAME}. Last updated: August 4, 2026.
       </p>
 
       <div className="mt-8 space-y-6 text-sm leading-relaxed text-[var(--text)]">
         <section className="space-y-2">
           <h2 className="text-base font-bold">What we collect</h2>
           <p className="text-[var(--muted)]">
-            When you create an account we store your email address and
-            authentication identifiers from Supabase Auth. When you use the
-            calculator we store company and trial metadata, and any dip
-            calculations you save (tank chart selection, dips, volumes, location
-            label, typed signature name, and related discharge fields).
+            When you create an account we store your phone number (for SMS
+            one-time codes) and/or email address, plus authentication
+            identifiers from Supabase Auth. SMS delivery is handled by our SMS
+            provider. When you use the calculator we store company and trial
+            metadata, and any dip calculations you save (tank chart selection,
+            dips, volumes, location label, typed signature name, and related
+            discharge fields).
           </p>
         </section>
 
