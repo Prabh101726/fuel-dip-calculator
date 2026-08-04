@@ -13,19 +13,21 @@ Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 **Status:** Foundation (Jul 23), driver-facing + password auth (Jul 23),
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
 **calculator form UX (Jul 28)**, **offline PWA / Project 2 (Jul 29)**,
-**direct-to-driver Stripe billing (Jul 31)**, and **soft-launch polish
-(Aug 1)** are merged to `main` and **live in production**:
+**direct-to-driver Stripe billing (Jul 31)**, **soft-launch polish (Aug 1)**,
+and **phone OTP login + subscribed UI (Aug 4)** are merged to `main` and
+**live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
-Live now: email/password signup with Confirm email, forgot-password /
-`/auth/reset-password`, **7-day trial** for new companies (was 14-day at
+Live now: **phone OTP sign-in as the primary auth path** (+1 NANP, server-side
+throttle; email login + forgot-password kept for legacy accounts only — no new
+email signup in the UI), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
-company/driver on first confirmed signup or sign-in, 4-tab multi-tank
+company/driver on first verified sign-in, 4-tab multi-tank
 calculator with **product-grade dropdown** (tab labels `1. E15 Reg` /
 `2. #526` / `Tank N`), per-tab **Clear** + **Reset all tanks**,
 **installable PWA** with used-tank chart cache, draft restore, and offline
 save queue, **Stripe Checkout** `$2.99 CAD/month per driver` (early pay via
-`/subscribe` during trial; Billing portal after a real subscription status),
+`/subscribe` during trial; **Plan active** + Billing portal when subscribed),
 public `/about` + `/guide` + `/privacy` + `/terms` (shared `SiteFooter`),
 safety reminders, and flat history. Operator: **Detours Fleet Operations**
 (`OPERATOR_NAME` in `lib/app-copy.ts`). Soft-launch tag: **v0.2.0**. Specs:
@@ -34,25 +36,35 @@ safety reminders, and flat history. Operator: **Detours Fleet Operations**
 `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`,
 `docs/superpowers/specs/2026-07-30-stripe-billing-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
-(**auth diverged twice** — magic-link trial → password auth; password is live).
+(**auth diverged three times** — magic-link trial → password auth → phone OTP;
+phone OTP is live/primary). Aug 4 audit:
+`docs/audit-2026-08-04-phone-otp-stripe.md`.
 
 **Still open / next priorities:**
-- **Stripe ops smoke (user):** end-to-end pay → webhook updates
-  `drivers.subscription_status` → Billing portal → cancel. Confirm webhook
-  endpoint on `https://fuel-dip-calculator.app/api/stripe/webhook` and
-  `NEXT_PUBLIC_SITE_URL=https://fuel-dip-calculator.app`. Product
+- **Stripe auto-unlock unproven (user ops):** the event destination
+  (`we_1U0k2O13QgrVjwffp66xuTVP` → `/api/stripe/webhook`, events
+  `checkout.session.completed` + `customer.subscription.*`) was only created
+  Aug 4 after 7 days of zero deliveries — the Aug 4 paid smoke user was
+  **manually SQL-backfilled** to `subscription_status = 'active'`. Before
+  trusting auto-unlock: Stripe → Webhooks → **Send test event → 200**, or a
+  second real Checkout that flips status without SQL. Product
   `prod_UzHfQGqENZ1QUU` / Price `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD,
-  lookup `fuel_dip_monthly`). Archive duplicate unused Stripe product if still
-  present.
+  lookup `fuel_dip_monthly`).
+- **Disable Supabase email signup server-side (user ops):** Authentication →
+  Providers → Email → turn off **Enable email signup**. UI already has no
+  create-account path, but the API can still mint email users. Existing email
+  accounts stay valid — do NOT disable the Email provider itself.
 - Supabase Auth **Site URL** / redirect allow-list should include
-  `https://fuel-dip-calculator.app` (+ `/auth/callback`, `/auth/reset-password`).
+  `https://fuel-dip-calculator.app` (+ `/auth/callback`, `/auth/reset-password`)
+  for remaining legacy email confirm/reset links.
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
-- **H3 ops (user):** Supabase Dashboard → Authentication → Passwords → enable
-  **Leaked password protection** (HaveIBeenPwned). Do not `supabase config push`.
 - **Project 2 on-device manual checklist** not yet confirmed: install PWA →
   airplane mode → cached-tank calc → queued save → reconnect flush → draft
   restore after swipe-up → expired-trial offline gate.
+- **Web push to nudge email→phone migration** — product ask, not built (needs
+  design; audience = the 5 email-only users). Wiping/migrating email users
+  stays **out of scope** (user decision Aug 4).
 - Signature capture (image), history filtering, 12 flagged tanks in
   `review_needed.json`, Sentry, mismatch-audit UI, security headers — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
@@ -80,7 +92,8 @@ passed Jul 29 — SQL interpolation verified against regression tanks
 - **H4:** `/auth/callback` `next` allowlisted to `/calculator` | `/history`
   via `lib/auth/safeNextPath.ts` (fixed a real open redirect —
   `next=@evil.com` produced a userinfo-host URL).
-- **H3:** still manual dashboard toggle (see Still open).
+- **H3:** leaked-password protection (HaveIBeenPwned) — user confirmed the
+  dashboard toggle is **ON** (Aug 4 2026). Closed; all four hardenings done.
 - Interplay: an expired-trial row flushed from the offline outbox now gets a
   42501 RLS rejection → classified poison (surfaced as failed, queue not
   wedged) — by design.
@@ -157,6 +170,32 @@ unchanged — only the credential mechanism changed. A stale `otp_expired` /
 `access_denied` URL error is caught and shown as "that email link expired,
 sign in with email and password instead" (leftover magic-link links a driver
 might still have).
+
+## Auth: password → phone OTP (Aug 4 2026)
+
+Phone OTP is now the **primary** sign-in (commit `a26073c`); email/password is
+legacy-only for pre-existing accounts.
+
+- Flow: `+1` NANP phone (`lib` NANP helpers) → legal checkbox →
+  `request_otp_throttle` RPC → `signInWithOtp` → `verifyOtp` →
+  `ensure_trial_driver()` → `my_access_active()` → calculator.
+- Migration `20260804120000_phone_otp_throttle.sql`: `otp_throttle` table
+  (RLS deny-all) + `request_otp_throttle` RPC (anon + authenticated; **60s /
+  5 per hr / 15 per day** per phone) + phone-aware `ensure_trial_driver()`
+  (company named from email local-part, or `driver-XXXX` from phone).
+- Unique phone enforced by `auth.users` index `users_phone_key`.
+- Twilio: subaccount **Fuel Dip Calculator** under the Detours parent, local CA
+  sender `+12494022522`, Messaging Service `MGad57b6b121fd6d7dedea793d6a61f147`,
+  geo CA+US, Programmable Messaging (**not** Twilio Verify). SIDs live only in
+  Supabase Auth SMS config + password manager — never in git/Vercel.
+- Supabase Phone provider enabled alongside Email; SMS rate limits left at
+  **default** deliberately — do not raise without more product throttle work.
+- Sessions: Supabase defaults untouched (refresh tokens rotate, don't expire)
+  → ~1 OTP per device sign-in. Do **not** add session time-boxing; it would
+  multiply SMS cost.
+- **No new email signup** in UI (no `signUp` call); email sign-in +
+  forgot-password remain for the legacy email accounts. Wiping/migrating those
+  accounts was explicitly ruled out (Aug 4) — don't propose it.
 
 ## Pre-production readiness (Jul 26 2026)
 
@@ -241,6 +280,14 @@ Direct-to-driver B2C — **not** company/fleet billing. Spec:
   **Billing** only when `shouldShowBillingLink` (customer **and** non-null
   `subscription_status` — abandoned Checkout creates a customer with null
   status and must not show Billing).
+- **Subscribed UI (Aug 4, `e1814bf`):** **Plan active** + Billing for
+  subscribed drivers; billing state refreshes on window focus/online; Billing
+  link also shows when status is active even if the client customer flag lags.
+- **Webhook ops (Aug 4):** Stripe event destination
+  `we_1U0k2O13QgrVjwffp66xuTVP` → `https://fuel-dip-calculator.app/api/stripe/webhook`
+  created Aug 4 (none existed before — root cause of "paid but locked");
+  `STRIPE_WEBHOOK_SECRET` set in Vercel. Auto-unlock **not yet proven
+  end-to-end** — see Still open.
 - **Post-pay hang fix:** blocked IDB paint then `refreshOnline` unlock must
   hydrate drafts (`needsDraftHydrationAfterUnlock`); checkout return polls
   ~10s (`waitForActiveSubscription`) before showing Subscribe again.
