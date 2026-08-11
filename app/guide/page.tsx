@@ -19,9 +19,7 @@ export default function GuidePage() {
           <h2 className="text-base font-bold">1. Sign in</h2>
           <p className="text-[var(--muted)]">
             Sign in with your Canada / US mobile number — we text a one-time
-            code. First sign-in starts your trial. Existing email accounts can
-            still use “Sign in with email” (and forgot password) on the login
-            screen; new accounts use phone.
+            code. First sign-in starts your trial. New accounts use phone only.
           </p>
         </section>
 

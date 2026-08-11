@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { safeAuthCallbackNext } from "@/lib/auth/safeNextPath";
 import { createClient } from "@/lib/supabase/server";
 
-/** Kept for optional email-confirm redirects; primary auth is phone OTP on /login. */
+/** Optional PKCE / OAuth redirects; primary auth is phone OTP on /login. */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");

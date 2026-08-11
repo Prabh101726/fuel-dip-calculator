@@ -4,17 +4,13 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SiteFooter from "@/app/components/SiteFooter";
-import {
-  SAFETY_REMINDER,
-  TRIAL_DAYS,
-  resetPasswordUrl,
-} from "@/lib/app-copy";
+import { SAFETY_REMINDER, TRIAL_DAYS } from "@/lib/app-copy";
 import { mapOtpThrottleError } from "@/lib/auth/otpThrottle";
 import { safePostAuthNext } from "@/lib/auth/safeNextPath";
 import { formatNanpDisplay, toNanpE164 } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/client";
 
-type Path = "phone" | "verify" | "email" | "forgot";
+type Path = "phone" | "verify";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -22,8 +18,6 @@ export default function LoginForm() {
   const [path, setPath] = useState<Path>("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -34,7 +28,7 @@ export default function LoginForm() {
     const err = searchParams.get("error");
     const code = searchParams.get("error_code");
     if (code === "otp_expired" || err === "access_denied") {
-      return "That email link expired. Sign in with phone, or use email and password if you have an existing account.";
+      return "That link expired. Sign in with your mobile number.";
     }
     if (err === "auth") {
       return "Sign-in failed. Try again.";
@@ -192,58 +186,11 @@ export default function LoginForm() {
     setMessage("New code sent.");
   }
 
-  async function onEmailSubmit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage("");
-    setIsError(false);
-
-    const supabase = createClient();
-    const trimmed = email.trim();
-
-    if (path === "forgot") {
-      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
-        redirectTo: resetPasswordUrl(window.location.origin),
-      });
-      setBusy(false);
-      if (error) {
-        setIsError(true);
-        setMessage(error.message || "Could not send reset email.");
-        return;
-      }
-      setIsError(false);
-      setMessage("Check your email for a password reset link.");
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: trimmed,
-      password,
-    });
-    if (error) {
-      setBusy(false);
-      setIsError(true);
-      setMessage(error.message || "Could not sign in.");
-      return;
-    }
-    await afterAuth();
-  }
-
-  const title =
-    path === "verify"
-      ? "Enter code"
-      : path === "email"
-        ? "Email sign in"
-        : path === "forgot"
-          ? "Reset password"
-          : "Sign in";
-
+  const title = path === "verify" ? "Enter code" : "Sign in";
   const subtitle =
     path === "verify"
       ? `We texted a 6-digit code to ${formatNanpDisplay(phone)}.`
-      : path === "email" || path === "forgot"
-        ? "For existing email accounts only. New drivers use phone."
-        : `Canada / US mobile. First sign-in starts a ${TRIAL_DAYS}-day trial.`;
+      : `Canada / US mobile. First sign-in starts a ${TRIAL_DAYS}-day trial.`;
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-4 py-12">
@@ -258,207 +205,113 @@ export default function LoginForm() {
         {SAFETY_REMINDER}
       </p>
 
-      {(path === "phone" || path === "verify") && (
-        <>
-          {path === "phone" ? (
-            <form onSubmit={onSendCode} className="mt-6 flex flex-col gap-4">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                  Mobile number
-                </span>
-                <input
-                  type="tel"
-                  required
-                  autoComplete="tel"
-                  inputMode="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                  placeholder="(416) 555-0100"
-                />
-                <span className="text-xs text-[var(--muted)]">
-                  Canada / US (+1). We’ll text a one-time code.
-                </span>
-              </label>
+      {path === "phone" ? (
+        <form onSubmit={onSendCode} className="mt-6 flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+              Mobile number
+            </span>
+            <input
+              type="tel"
+              required
+              autoComplete="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              placeholder="(416) 555-0100"
+            />
+            <span className="text-xs text-[var(--muted)]">
+              Canada / US (+1). We’ll text a one-time code.
+            </span>
+          </label>
 
-              <label className="flex items-start gap-3 text-sm text-[var(--muted)]">
-                <input
-                  type="checkbox"
-                  checked={acceptedLegal}
-                  onChange={(e) => setAcceptedLegal(e.target.checked)}
-                  className="mt-1"
-                  required
-                />
-                <span>
-                  I agree to the{" "}
-                  <Link href="/terms" className="font-bold text-[var(--accent)]">
-                    Terms of Use
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="font-bold text-[var(--accent)]"
-                  >
-                    Privacy Policy
-                  </Link>
-                  .
-                </span>
-              </label>
-
-              <button
-                type="submit"
-                disabled={busy}
-                className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
-              >
-                {busy ? "Sending…" : "Send verification code"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={onVerify} className="mt-6 flex flex-col gap-4">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                  Verification code
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  required
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) =>
-                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-center text-2xl tracking-[0.35em] text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                  placeholder="••••••"
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={busy || otp.length < 6}
-                className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
-              >
-                {busy ? "Checking…" : "Verify & continue"}
-              </button>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPath("phone");
-                    setOtp("");
-                    setMessage("");
-                    setIsError(false);
-                  }}
-                  className="font-bold text-[var(--accent)]"
-                >
-                  Change number
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || resendCooldown > 0}
-                  onClick={() => void onResend()}
-                  className="font-bold text-[var(--accent)] disabled:opacity-50"
-                >
-                  {resendCooldown > 0
-                    ? `Resend in ${resendCooldown}s`
-                    : "Resend code"}
-                </button>
-              </div>
-            </form>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setPath("email");
-              setMessage("");
-              setIsError(false);
-            }}
-            className="mt-6 text-sm font-bold text-[var(--muted)] underline-offset-2 hover:text-[var(--accent)] hover:underline"
-          >
-            Have an existing email account? Sign in with email
-          </button>
-        </>
-      )}
-
-      {(path === "email" || path === "forgot") && (
-        <>
-          <form onSubmit={onEmailSubmit} className="mt-6 flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                Email
-              </span>
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                placeholder="you@company.com"
-              />
-            </label>
-
-            {path === "email" && (
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                  Password
-                </span>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-base text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                  placeholder="Your password"
-                />
-              </label>
-            )}
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
-            >
-              {busy
-                ? "Working…"
-                : path === "forgot"
-                  ? "Send reset link"
-                  : "Sign in with email"}
-            </button>
-          </form>
-
-          <div className="mt-4 flex flex-col gap-2 text-sm">
-            {path === "email" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPath("forgot");
-                  setMessage("");
-                  setIsError(false);
-                }}
+          <label className="flex items-start gap-3 text-sm text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={acceptedLegal}
+              onChange={(e) => setAcceptedLegal(e.target.checked)}
+              className="mt-1"
+              required
+            />
+            <span>
+              I agree to the{" "}
+              <Link href="/terms" className="font-bold text-[var(--accent)]">
+                Terms of Use
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
                 className="font-bold text-[var(--accent)]"
               >
-                Forgot password?
-              </button>
-            )}
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
+          >
+            {busy ? "Sending…" : "Send verification code"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={onVerify} className="mt-6 flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
+              Verification code
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              maxLength={6}
+              value={otp}
+              onChange={(e) =>
+                setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              className="min-h-12 rounded-lg border border-[var(--border)] bg-[var(--input)] px-3.5 text-center text-2xl tracking-[0.35em] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              placeholder="••••••"
+            />
+          </label>
+
+          <button
+            type="submit"
+            disabled={busy || otp.length < 6}
+            className="min-h-12 rounded-lg bg-[var(--accent)] px-4 text-base font-bold text-[var(--accent-fg)] disabled:opacity-60"
+          >
+            {busy ? "Checking…" : "Verify & continue"}
+          </button>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
             <button
               type="button"
               onClick={() => {
-                setPath(path === "forgot" ? "email" : "phone");
+                setPath("phone");
+                setOtp("");
                 setMessage("");
                 setIsError(false);
               }}
               className="font-bold text-[var(--accent)]"
             >
-              {path === "forgot" ? "Back to email sign in" : "Back to phone sign in"}
+              Change number
+            </button>
+            <button
+              type="button"
+              disabled={busy || resendCooldown > 0}
+              onClick={() => void onResend()}
+              className="font-bold text-[var(--accent)] disabled:opacity-50"
+            >
+              {resendCooldown > 0
+                ? `Resend in ${resendCooldown}s`
+                : "Resend code"}
             </button>
           </div>
-        </>
+        </form>
       )}
 
       {(urlError !== "" || message !== "") && (

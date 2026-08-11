@@ -25,7 +25,8 @@ We aim to acknowledge reports within a few business days.
 
 ## Current security model (v0.2.0)
 
-- **Auth:** Supabase Auth, email/password, Confirm email enabled, forgot-password via `/auth/reset-password`
+- **Auth:** Supabase Auth, **phone OTP only** (Canada / US +1). No email signup
+  or email/password sign-in in the app.
 - **Tenancy:** Company-scoped data via Postgres **Row Level Security** on `drivers` / `dip_calculations`; dip chart catalog (`tank_types`, `dip_chart_points`) is shared reference data readable by authenticated users
 - **Trial gate:** Middleware + offline IDB cache for UI; **`my_trial_active()` RLS** blocks `dip_calculations` INSERT/UPDATE after trial end (SELECT still allowed for own rows)
 - **Secrets:** Only `NEXT_PUBLIC_*` Supabase keys in the browser; service role / DB password stay server-side / `.env.local` (never committed)
@@ -37,10 +38,9 @@ We aim to acknowledge reports within a few business days.
 
 These are intentional or deferred — not considered resolved:
 
-- **Open self-signup** — anyone can create an account and start a trial (email confirm required)
-- **Paid billing** (`$2.99 CAD/month per driver`) — Checkout/webhook in app; configure Stripe keys + webhook in production env
+- **Open self-signup** — anyone with a Canada / US mobile can create an account and start a trial (OTP)
 - **Offline History** is not supported — History needs network
-- **Leaked-password protection** — enable in Supabase Dashboard → Auth → Passwords (HaveIBeenPwned); do not `supabase config push`
+- **Leaked-password protection** — less critical with phone-only auth; enable in Supabase if email provider stays on for legacy rows
 - **Mismatch UI** — `volume_mismatch` rows are audit/query only; no driver-facing banner yet
 
 ## Out of scope for reports

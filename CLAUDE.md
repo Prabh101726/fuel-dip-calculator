@@ -18,9 +18,8 @@ and **phone OTP login + subscribed UI (Aug 4)** are merged to `main` and
 **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
-Live now: **phone OTP sign-in as the primary auth path** (+1 NANP, server-side
-throttle; email login + forgot-password kept for legacy accounts only — no new
-email signup in the UI), **7-day trial** for new companies (was 14-day at
+Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
+UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
 company/driver on first verified sign-in, 4-tab multi-tank
 calculator with **product-grade dropdown** (tab labels `1. E15 Reg` /
@@ -36,39 +35,22 @@ safety reminders, and flat history. Operator: **Detours Fleet Operations**
 `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`,
 `docs/superpowers/specs/2026-07-30-stripe-billing-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
-(**auth diverged three times** — magic-link trial → password auth → phone OTP;
-phone OTP is live/primary). Aug 4 audit:
-`docs/audit-2026-08-04-phone-otp-stripe.md`.
+(**auth diverged** — magic-link → password → phone OTP; phone-only UI live).
+Aug 11 audit: `docs/audit-2026-08-11-production-readiness.md`.
 
 **Still open / next priorities:**
-- **Stripe auto-unlock unproven (user ops):** the event destination
-  (`we_1U0k2O13QgrVjwffp66xuTVP` → `/api/stripe/webhook`, events
-  `checkout.session.completed` + `customer.subscription.*`) was only created
-  Aug 4 after 7 days of zero deliveries — the Aug 4 paid smoke user was
-  **manually SQL-backfilled** to `subscription_status = 'active'`. Before
-  trusting auto-unlock: Stripe → Webhooks → **Send test event → 200**, or a
-  second real Checkout that flips status without SQL. Product
-  `prod_UzHfQGqENZ1QUU` / Price `price_1TzJ6e13QgrVjwffdpj7y0nD` (CAD,
-  lookup `fuel_dip_monthly`).
 - **Disable Supabase email signup server-side (user ops):** Authentication →
-  Providers → Email → turn off **Enable email signup**. UI already has no
-  create-account path, but the API can still mint email users. Existing email
-  accounts stay valid — do NOT disable the Email provider itself.
-- Supabase Auth **Site URL** / redirect allow-list should include
-  `https://fuel-dip-calculator.app` (+ `/auth/callback`, `/auth/reset-password`)
-  for remaining legacy email confirm/reset links.
+  Providers → Email → turn off **Enable email signup** so the Auth API cannot
+  mint new email users. App UI is phone-only; do NOT `supabase config push`.
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **Project 2 on-device manual checklist** not yet confirmed: install PWA →
   airplane mode → cached-tank calc → queued save → reconnect flush → draft
   restore after swipe-up → expired-trial offline gate.
-- **Web push to nudge email→phone migration** — product ask, not built (needs
-  design; audience = the 5 email-only users). Wiping/migrating email users
-  stays **out of scope** (user decision Aug 4).
 - Signature capture (image), history filtering, 12 flagged tanks in
   `review_needed.json`, Sentry, mismatch-audit UI, security headers — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
-  (can clobber dashboard Auth URL / Confirm email settings).
+  (can clobber dashboard Auth URL / SMS settings).
 
 ## Security hardenings (Jul 29 2026)
 
@@ -171,10 +153,9 @@ unchanged — only the credential mechanism changed. A stale `otp_expired` /
 sign in with email and password instead" (leftover magic-link links a driver
 might still have).
 
-## Auth: password → phone OTP (Aug 4 2026)
+## Auth: password → phone OTP (Aug 4 2026) → phone-only UI (Aug 11)
 
-Phone OTP is now the **primary** sign-in (commit `a26073c`); email/password is
-legacy-only for pre-existing accounts.
+Phone OTP is the **only** sign-in / signup path in the app.
 
 - Flow: `+1` NANP phone (`lib` NANP helpers) → legal checkbox →
   `request_otp_throttle` RPC → `signInWithOtp` → `verifyOtp` →
@@ -188,14 +169,13 @@ legacy-only for pre-existing accounts.
   sender `+12494022522`, Messaging Service `MGad57b6b121fd6d7dedea793d6a61f147`,
   geo CA+US, Programmable Messaging (**not** Twilio Verify). SIDs live only in
   Supabase Auth SMS config + password manager — never in git/Vercel.
-- Supabase Phone provider enabled alongside Email; SMS rate limits left at
-  **default** deliberately — do not raise without more product throttle work.
+- Supabase Phone provider enabled; SMS rate limits left at **default**.
 - Sessions: Supabase defaults untouched (refresh tokens rotate, don't expire)
   → ~1 OTP per device sign-in. Do **not** add session time-boxing; it would
   multiply SMS cost.
-- **No new email signup** in UI (no `signUp` call); email sign-in +
-  forgot-password remain for the legacy email accounts. Wiping/migrating those
-  accounts was explicitly ruled out (Aug 4) — don't propose it.
+- Aug 11: email/password UI, forgot-password flow, and reset-password form
+  removed. `/auth/reset-password` now points users to phone sign-in. Ops:
+  disable **Enable email signup** in the Email provider (do not config push).
 
 ## Pre-production readiness (Jul 26 2026)
 
