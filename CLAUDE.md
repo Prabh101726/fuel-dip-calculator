@@ -46,9 +46,9 @@ Full audit: `docs/audit-2026-08-11-production-readiness.md`.
   (~5 email-only auth users remain in DB but cannot sign in via the app.)
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
-- **Project 2 on-device manual checklist** not yet confirmed: install PWA →
-  airplane mode → cached-tank calc → queued save → reconnect flush → draft
-  restore after swipe-up → expired-trial offline gate.
+- ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
+  offline works (install / airplane / cached calc / queue / flush path verified
+  in the field). Keep load-bearing PWA constraints in the Offline section below.
 - Signature capture (image), history filtering, 12 flagged tanks in
   `review_needed.json`, Sentry, mismatch-audit UI, security headers — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
@@ -325,6 +325,7 @@ meta (`driverId` / `companyId` / `trialEndsAt`), 4-slot drafts, and a save
   online-only. Spec:
   `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`. Local PWA test:
   `npm run build && npm start` (or `npm run dev:pwa`).
+  **On-device checklist:** user confirmed offline works (Aug 11 2026).
 
 Review-hardened in `6e7f643` — three constraints from that fix round are
 load-bearing:
