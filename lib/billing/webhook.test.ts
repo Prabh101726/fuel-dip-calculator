@@ -58,6 +58,28 @@ describe("driverPatchFromStripeEvent", () => {
     );
   });
 
+  it("reads period end from subscription item when top-level missing (2026 API)", () => {
+    const update = driverPatchFromStripeEvent(
+      asEvent("customer.subscription.updated", {
+        id: "sub_item_period",
+        status: "active",
+        customer: "cus_x",
+        metadata: { driver_id: "drv-x" },
+        items: {
+          data: [
+            {
+              price: { id: "price_abc" },
+              current_period_end: 1_800_000_100,
+            },
+          ],
+        },
+      }),
+    );
+    expect(update?.patch.subscription_current_period_end).toBe(
+      new Date(1_800_000_100 * 1000).toISOString(),
+    );
+  });
+
   it("maps subscription.deleted to canceled", () => {
     const update = driverPatchFromStripeEvent(
       asEvent("customer.subscription.deleted", {

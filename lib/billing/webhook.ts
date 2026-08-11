@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { billingPatchFromSubscription } from "./syncSubscription";
 
 export type DriverBillingPatch = {
   stripe_customer_id?: string | null;
@@ -14,30 +15,8 @@ export type DriverBillingUpdate = {
   patch: DriverBillingPatch;
 };
 
-function periodEndIso(sub: Stripe.Subscription): string | null {
-  // Stripe Node types for newer API versions may omit this field on Subscription.
-  const end = (sub as Stripe.Subscription & { current_period_end?: number })
-    .current_period_end;
-  if (typeof end !== "number") return null;
-  return new Date(end * 1000).toISOString();
-}
-
-function priceIdFromSub(sub: Stripe.Subscription): string | null {
-  const item = sub.items?.data?.[0];
-  const price = item?.price;
-  if (!price) return null;
-  return typeof price === "string" ? price : price.id;
-}
-
 function patchFromSubscription(sub: Stripe.Subscription): DriverBillingPatch {
-  return {
-    stripe_customer_id:
-      typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
-    stripe_subscription_id: sub.id,
-    subscription_status: sub.status,
-    subscription_price_id: priceIdFromSub(sub),
-    subscription_current_period_end: periodEndIso(sub),
-  };
+  return billingPatchFromSubscription(sub);
 }
 
 /**

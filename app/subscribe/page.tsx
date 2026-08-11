@@ -6,7 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { MONTHLY_PRICE_LABEL } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import { startCheckout } from "@/lib/billing/startCheckout";
-import { waitForActiveSubscription } from "@/lib/billing/waitForActiveSubscription";
+import { waitForActiveSubscriptionWithSync } from "@/lib/billing/waitForActiveSubscriptionWithSync";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SubscribePage() {
@@ -67,7 +67,7 @@ function SubscribeInner() {
       if (searchParams.get("checkout") === "success") {
         setConfirmingPayment(true);
         setChecking(false);
-        const ok = await waitForActiveSubscription(readStatus, {
+        const ok = await waitForActiveSubscriptionWithSync(readStatus, {
           timeoutMs: 10_000,
           intervalMs: 800,
           signal: ac.signal,

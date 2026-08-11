@@ -3,7 +3,7 @@
 import { SAFETY_REMINDER } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import { shouldShowBillingLink } from "@/lib/billing/shouldShowBillingLink";
-import { waitForActiveSubscription } from "@/lib/billing/waitForActiveSubscription";
+import { waitForActiveSubscriptionWithSync } from "@/lib/billing/waitForActiveSubscriptionWithSync";
 import { needsDraftHydrationAfterUnlock } from "@/lib/calculator/needsDraftHydrationAfterUnlock";
 import {
   blankSlotDraft,
@@ -500,7 +500,7 @@ export default function CalculatorClient() {
     void (async () => {
       setConfirmingCheckout(true);
 
-      const ok = await waitForActiveSubscription(
+      const ok = await waitForActiveSubscriptionWithSync(
         async () => {
           const {
             data: { user },

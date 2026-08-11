@@ -6,7 +6,7 @@ import SiteFooter from "@/app/components/SiteFooter";
 import { CONTACT_EMAIL, MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
 import { isActiveSubscriptionStatus } from "@/lib/billing/access";
 import { startCheckout } from "@/lib/billing/startCheckout";
-import { waitForActiveSubscription } from "@/lib/billing/waitForActiveSubscription";
+import { waitForActiveSubscriptionWithSync } from "@/lib/billing/waitForActiveSubscriptionWithSync";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TrialEndedPage() {
@@ -68,7 +68,7 @@ function TrialEndedInner() {
       if (awaitingCheckout) {
         setConfirmingPayment(true);
         setChecking(false);
-        const ok = await waitForActiveSubscription(readStatus, {
+        const ok = await waitForActiveSubscriptionWithSync(readStatus, {
           timeoutMs: 10_000,
           intervalMs: 800,
           signal: ac.signal,
