@@ -14,8 +14,8 @@ Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
 **calculator form UX (Jul 28)**, **offline PWA / Project 2 (Jul 29)**,
 **direct-to-driver Stripe billing (Jul 31)**, **soft-launch polish (Aug 1)**,
-and **phone OTP login + subscribed UI (Aug 4)** are merged to `main` and
-**live in production**:
+**phone OTP login + subscribed UI (Aug 4)**, and **Aug 11 billing unlock +
+phone-only auth** are merged to `main` and **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
@@ -26,7 +26,8 @@ calculator with **product-grade dropdown** (tab labels `1. E15 Reg` /
 `2. #526` / `Tank N`), per-tab **Clear** + **Reset all tanks**,
 **installable PWA** with used-tank chart cache, draft restore, and offline
 save queue, **Stripe Checkout** `$2.99 CAD/month per driver` (early pay via
-`/subscribe` during trial; **Plan active** + Billing portal when subscribed),
+`/subscribe` during trial; **Plan active** + Billing portal when subscribed;
+webhook **200** proven Aug 11 + `/api/stripe/sync` fallback),
 public `/about` + `/guide` + `/privacy` + `/terms` (shared `SiteFooter`),
 safety reminders, and flat history. Operator: **Detours Fleet Operations**
 (`OPERATOR_NAME` in `lib/app-copy.ts`). Soft-launch tag: **v0.2.0**. Specs:
@@ -36,12 +37,13 @@ safety reminders, and flat history. Operator: **Detours Fleet Operations**
 `docs/superpowers/specs/2026-07-30-stripe-billing-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged** — magic-link → password → phone OTP; phone-only UI live).
-Aug 11 audit: `docs/audit-2026-08-11-production-readiness.md`.
+Full audit: `docs/audit-2026-08-11-production-readiness.md`.
 
 **Still open / next priorities:**
 - **Disable Supabase email signup server-side (user ops):** Authentication →
   Providers → Email → turn off **Enable email signup** so the Auth API cannot
   mint new email users. App UI is phone-only; do NOT `supabase config push`.
+  (~5 email-only auth users remain in DB but cannot sign in via the app.)
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **Project 2 on-device manual checklist** not yet confirmed: install PWA →
@@ -109,9 +111,11 @@ passed Jul 29 — SQL interpolation verified against regression tanks
   clients + session-refresh middleware (`@supabase/ssr`).
 - `middleware.ts` — gates `/calculator` and `/history` behind an active
   session + `my_access_active()` (trial **or** paid); redirects to `/login` or
-  `/trial-ended`. Allows `/calculator?checkout=success` through so the client
-  can poll while the webhook catches up. `/subscribe`, `/about`, `/guide`,
-  `/privacy`, `/terms` are public or auth-only as documented below.
+  `/trial-ended`. Allows `/calculator?checkout=success` **only if** the driver
+  already has `stripe_customer_id` (started Checkout) — prevents expired users
+  from self-bypassing with the query string (`shouldBypassAccessForCheckoutSuccess`).
+  `/subscribe`, `/about`, `/guide`, `/privacy`, `/terms` are public or auth-only
+  as documented below.
 - `app/login/page.tsx` + `LoginForm.tsx` — originally email-only magic-link
   sign-in; **superseded same day, see "Auth: magic-link → password" below.**
 - `app/auth/callback/route.ts` — exchanges an auth code for a session, calls
@@ -254,6 +258,9 @@ Direct-to-driver B2C — **not** company/fleet billing. Spec:
 - `POST /api/stripe/portal` — this driver's Customer Portal.
 - `POST /api/stripe/webhook` — signature required; 500 if no driver row matched
   (Stripe retries).
+- `POST /api/stripe/sync` — authenticated; pulls live Stripe subscription into
+  `drivers` (webhook lag / failure fallback). Checkout return uses
+  `waitForActiveSubscriptionWithSync`.
 - Access: `my_access_active()` + client `isAccessActive()` /
   `isActiveSubscriptionStatus()`.
 - **Early subscribe:** calculator **Subscribe** when online and not paid;
@@ -263,16 +270,36 @@ Direct-to-driver B2C — **not** company/fleet billing. Spec:
 - **Subscribed UI (Aug 4, `e1814bf`):** **Plan active** + Billing for
   subscribed drivers; billing state refreshes on window focus/online; Billing
   link also shows when status is active even if the client customer flag lags.
-- **Webhook ops (Aug 4):** Stripe event destination
-  `we_1U0k2O13QgrVjwffp66xuTVP` → `https://fuel-dip-calculator.app/api/stripe/webhook`
-  created Aug 4 (none existed before — root cause of "paid but locked");
-  `STRIPE_WEBHOOK_SECRET` set in Vercel. Auto-unlock **not yet proven
-  end-to-end** — see Still open.
+- **Webhook (verified Aug 11):** destination
+  `we_1U0k2O13QgrVjwffp66xuTVP` → `https://fuel-dip-calculator.app/api/stripe/webhook`.
+  Earlier 400s were **Invalid signature** (Vercel `STRIPE_WEBHOOK_SECRET`
+  mismatched `whsec_…`). After secret update + redeploy, manual resend →
+  **200** `{received:true}`. Invoice address comes from Stripe **Business /
+  Public details** (not Profile `@detours`); operator set display to GTA /
+  Ontario / Canada.
 - **Post-pay hang fix:** blocked IDB paint then `refreshOnline` unlock must
   hydrate drafts (`needsDraftHydrationAfterUnlock`); checkout return polls
-  ~10s (`waitForActiveSubscription`) before showing Subscribe again.
+  ~10s with sync before showing Subscribe again.
 - Logout clears offline session/drafts/outbox (`clearOfflineUserData`) with
   confirm if pending saves exist.
+
+## Aug 11 2026 — billing unlock, security, phone-only (verified)
+
+Shipped to `main` / production the same day. Audit:
+`docs/audit-2026-08-11-production-readiness.md`.
+
+| Commit | What |
+| --- | --- |
+| `0d4889a` | `/api/stripe/sync` + post-checkout sync poll (webhook lag fallback) |
+| `5ec24b6` | Checkout bypass requires `stripe_customer_id`; revoke anon EXECUTE on `my_company_id` / trigger-only `recompute_dip_volumes` (migration `20260811154111_revoke_anon_helper_execute`, applied live) |
+| `36511dc` | Phone-only login UI; reset-password page → phone CTA; docs/SECURITY/README |
+
+**Verified live:**
+- Second real pay (`16476209013` / `sub_1U3H6413…`) — Stripe Active; app stuck on Confirming until SQL backfill, then **Plan active** on device after refresh.
+- Webhook deliveries: failed 400 → after `whsec` fix, resend **200**.
+- Soft-launch audit: calc/auth/RLS/billing **PASS**; PWA device checklist + email-signup dashboard toggle still open.
+- CI at ship: **94** unit tests, typecheck, lint green.
+- Auth users snapshot (Aug 11): **3** phone (`14165655673`, `16476209013`, `17808504252` — two subscribed); **5** email-only (UI locked out, rows kept).
 
 ## Calculator form UX (Jul 28 2026)
 
