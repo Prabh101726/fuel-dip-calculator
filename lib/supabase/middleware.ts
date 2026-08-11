@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { shouldBypassAccessForCheckoutSuccess } from "@/lib/auth/checkoutSuccessBypass";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -64,12 +65,28 @@ export async function updateSession(request: NextRequest) {
   }
 
   // /subscribe: signed-in users only; skip access gate so trial drivers can pay early.
-  // After Checkout, allow /calculator?checkout=success through so the client can poll
-  // while the webhook catches up (avoids bouncing a just-paid driver to Subscribe).
+  // After Checkout, allow /calculator?checkout=success only if they already have a
+  // Stripe customer (started Checkout) so expired users cannot self-bypass.
   if (user && (path === "/calculator" || path === "/history" || path === "/")) {
-    const awaitingCheckout =
+    let awaitingCheckout = false;
+    if (
       path === "/calculator" &&
-      request.nextUrl.searchParams.get("checkout") === "success";
+      request.nextUrl.searchParams.get("checkout") === "success"
+    ) {
+      const { data: driver } = await supabase
+        .from("drivers")
+        .select("stripe_customer_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      awaitingCheckout = shouldBypassAccessForCheckoutSuccess({
+        path,
+        checkoutParam: request.nextUrl.searchParams.get("checkout"),
+        stripeCustomerId:
+          typeof driver?.stripe_customer_id === "string"
+            ? driver.stripe_customer_id
+            : null,
+      });
+    }
     if (!awaitingCheckout) {
       const { data: accessActive, error } = await supabase.rpc("my_access_active");
       if (error || accessActive !== true) {
