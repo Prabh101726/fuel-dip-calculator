@@ -43,7 +43,7 @@ Full audit: `docs/audit-2026-08-11-production-readiness.md`.
 - **Disable Supabase email signup server-side (user ops):** Authentication →
   Providers → Email → turn off **Enable email signup** so the Auth API cannot
   mint new email users. App UI is phone-only; do NOT `supabase config push`.
-  (~5 email-only auth users remain in DB but cannot sign in via the app.)
+  Email-only auth users were **deleted Aug 12** (3 phone users remain).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
