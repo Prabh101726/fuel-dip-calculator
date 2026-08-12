@@ -29,32 +29,35 @@ function wasDismissed(): boolean {
   }
 }
 
+function shouldShowInstallHint(): boolean {
+  if (typeof window === "undefined") return false;
+  return !isStandalone() && !wasDismissed();
+}
+
 /**
  * Add-to-home-screen / install control.
  * - Chromium: uses beforeinstallprompt when the browser offers it.
  * - iOS Safari: Apple blocks programmatic install — show Share steps.
  */
 export default function InstallHint() {
-  const [visible, setVisible] = useState(false);
-  const [ios, setIos] = useState(false);
+  const [visible, setVisible] = useState(shouldShowInstallHint);
+  const [ios] = useState(isIos);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
     null,
   );
   const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    if (isStandalone() || wasDismissed()) return;
-
-    setIos(isIos());
-    setVisible(true);
+    if (!visible) return;
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-  }, []);
+    return () =>
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+  }, [visible]);
 
   if (!visible) return null;
 
