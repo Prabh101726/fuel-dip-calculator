@@ -29,12 +29,16 @@ save queue, **Stripe Checkout** `$2.99 CAD/month per driver` (early pay via
 `/subscribe` during trial; **Plan active** + Billing portal when subscribed;
 webhook **200** proven Aug 11 + `/api/stripe/sync` fallback),
 public `/about` + `/guide` + `/privacy` + `/terms` (shared `SiteFooter`),
+auth-only `/feedback` (calculator header only — not in `SiteFooter`),
+**Share** referral link (`/login?ref=FDXXXX`; 14 extra days for the sharer
+when the friend pays and status is `active`),
 safety reminders, and flat history. Operator: **Detours Fleet Operations**
 (`OPERATOR_NAME` in `lib/app-copy.ts`). Soft-launch tag: **v0.2.0**. Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
 `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`,
 `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`,
-`docs/superpowers/specs/2026-07-30-stripe-billing-design.md`. Original v1
+`docs/superpowers/specs/2026-07-30-stripe-billing-design.md`,
+`docs/superpowers/specs/2026-08-13-feedback-and-referral-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged** — magic-link → password → phone OTP; phone-only UI live).
 Full audit: `docs/audit-2026-08-11-production-readiness.md`.
