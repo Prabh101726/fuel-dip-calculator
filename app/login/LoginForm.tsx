@@ -8,6 +8,11 @@ import { SAFETY_REMINDER, TRIAL_DAYS } from "@/lib/app-copy";
 import { mapOtpThrottleError } from "@/lib/auth/otpThrottle";
 import { safePostAuthNext } from "@/lib/auth/safeNextPath";
 import { formatNanpDisplay, toNanpE164 } from "@/lib/phone";
+import {
+  clearStoredReferralCode,
+  readStoredReferralCode,
+  rememberReferralCodeFromUrl,
+} from "@/lib/referral/storage";
 import { createClient } from "@/lib/supabase/client";
 
 type Path = "phone" | "verify";
@@ -37,6 +42,10 @@ export default function LoginForm() {
   }, [searchParams]);
 
   useEffect(() => {
+    rememberReferralCodeFromUrl(searchParams.get("ref"));
+  }, [searchParams]);
+
+  useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
@@ -45,6 +54,11 @@ export default function LoginForm() {
   async function afterAuth() {
     const supabase = createClient();
     await supabase.rpc("ensure_trial_driver");
+    const ref = readStoredReferralCode();
+    if (ref) {
+      await supabase.rpc("claim_referral", { p_code: ref });
+      clearStoredReferralCode();
+    }
     const { data: accessActive, error } = await supabase.rpc("my_access_active");
     const next = safePostAuthNext(searchParams.get("next"));
     if (error || accessActive !== true) {
