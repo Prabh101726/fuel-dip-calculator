@@ -3,6 +3,7 @@ import {
   billingPatchFromSubscription,
   selectBestSubscription,
 } from "@/lib/billing/syncSubscription";
+import { applyReferralGrantForDriver } from "@/lib/referral/applyGrant";
 import { getStripe } from "@/lib/stripe/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -73,8 +74,18 @@ export async function POST() {
     return NextResponse.json({ error: "Update failed" }, { status: 500 });
   }
 
+  const status =
+    typeof data?.subscription_status === "string"
+      ? data.subscription_status
+      : best.status;
+  try {
+    await applyReferralGrantForDriver(admin, driver.id, status);
+  } catch (grantErr) {
+    console.error("referral grant after sync failed", grantErr);
+  }
+
   return NextResponse.json({
     synced: true,
-    subscription_status: data?.subscription_status ?? best.status,
+    subscription_status: status,
   });
 }

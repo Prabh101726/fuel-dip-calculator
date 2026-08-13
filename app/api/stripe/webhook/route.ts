@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { driverPatchFromStripeEvent } from "@/lib/billing/webhook";
+import { applyReferralGrantForDriver } from "@/lib/referral/applyGrant";
 import { getStripe } from "@/lib/stripe/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, ignored: true });
   }
 
-  const { data, error } = await query.select("id");
+  const { data, error } = await query.select("id, subscription_status");
   if (error) {
     console.error("stripe webhook driver update failed", error);
     return NextResponse.json({ error: "Update failed" }, { status: 500 });
@@ -63,6 +64,14 @@ export async function POST(request: Request) {
       stripeCustomerId: update.stripeCustomerId,
     });
     return NextResponse.json({ error: "No matching driver" }, { status: 500 });
+  }
+
+  for (const row of data) {
+    const status =
+      typeof row.subscription_status === "string"
+        ? row.subscription_status
+        : null;
+    await applyReferralGrantForDriver(admin, row.id, status);
   }
 
   return NextResponse.json({ received: true });
