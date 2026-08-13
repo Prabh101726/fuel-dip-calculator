@@ -53,6 +53,9 @@ export default function CalculatorClient() {
   const [subscribed, setSubscribed] = useState(false);
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
   const [billingError, setBillingError] = useState("");
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralDaysGranted, setReferralDaysGranted] = useState(0);
+  const [shareFlash, setShareFlash] = useState("");
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -175,7 +178,9 @@ export default function CalculatorClient() {
     if (!user) return;
     const { data: driver } = await supabase
       .from("drivers")
-      .select("stripe_customer_id, subscription_status")
+      .select(
+        "stripe_customer_id, subscription_status, referral_code, referral_days_granted",
+      )
       .eq("id", user.id)
       .maybeSingle();
     if (!driver) return;
@@ -186,6 +191,14 @@ export default function CalculatorClient() {
     setHasBillingCustomer(Boolean(driver.stripe_customer_id));
     setSubscriptionStatus(status);
     setSubscribed(isActiveSubscriptionStatus(status));
+    setReferralCode(
+      typeof driver.referral_code === "string" ? driver.referral_code : null,
+    );
+    setReferralDaysGranted(
+      typeof driver.referral_days_granted === "number"
+        ? driver.referral_days_granted
+        : 0,
+    );
     const meta = await getSessionMeta();
     if (meta) {
       await putSessionMeta({
@@ -315,7 +328,7 @@ export default function CalculatorClient() {
 
       const { data: driver, error: driverErr } = await supabase
         .from("drivers")
-        .select("id, company_id, stripe_customer_id, subscription_status")
+        .select("id, company_id, stripe_customer_id, subscription_status, referral_code, referral_days_granted")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -352,6 +365,14 @@ export default function CalculatorClient() {
       setHasBillingCustomer(Boolean(driver.stripe_customer_id));
       setSubscriptionStatus(subscriptionStatus);
       setSubscribed(isActiveSubscriptionStatus(subscriptionStatus));
+      setReferralCode(
+        typeof driver.referral_code === "string" ? driver.referral_code : null,
+      );
+      setReferralDaysGranted(
+        typeof driver.referral_days_granted === "number"
+          ? driver.referral_days_granted
+          : 0,
+      );
       if (
         isOfflineAccessBlocked({
           trialEndsAt: trial,
@@ -574,6 +595,37 @@ export default function CalculatorClient() {
     router.refresh();
   }
 
+  async function shareReferral() {
+    let code = referralCode;
+    if (!code && driverId && isBrowserOnline()) {
+      const { data } = await supabase
+        .from("drivers")
+        .select("referral_code")
+        .eq("id", driverId)
+        .maybeSingle();
+      code = typeof data?.referral_code === "string" ? data.referral_code : null;
+      if (code) setReferralCode(code);
+    }
+    if (!code) {
+      setShareFlash("Needs network.");
+      return;
+    }
+    const url = `${window.location.origin}/login?ref=${code}`;
+    const text =
+      "Fuel Dip Calculator — 7-day trial. If you subscribe, I get 14 extra days.";
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: "Fuel Dip Calculator", text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareFlash("Link copied");
+      window.setTimeout(() => setShareFlash(""), 2500);
+    } catch {
+      /* user cancelled native share */
+    }
+  }
+
   if (trialBlocked && !confirmingCheckout) {
     return (
       <main className="mx-auto max-w-lg px-4 py-10">
@@ -647,6 +699,19 @@ export default function CalculatorClient() {
           >
             History
           </Link>
+          <Link
+            href="/feedback"
+            className="min-h-11 content-center text-[var(--accent)]"
+          >
+            Feedback
+          </Link>
+          <button
+            type="button"
+            onClick={() => void shareReferral()}
+            className="min-h-11 text-[var(--accent)]"
+          >
+            Share
+          </button>
           {online && subscribed && (
             <span className="min-h-11 content-center text-sm font-bold text-[var(--success)]">
               Plan active
@@ -704,6 +769,17 @@ export default function CalculatorClient() {
           </button>
         </div>
       </header>
+
+      {shareFlash !== "" && (
+        <p className="mb-4 text-sm font-semibold text-[var(--success)]" role="status">
+          {shareFlash}
+        </p>
+      )}
+      {referralDaysGranted > 0 && (
+        <p className="mb-4 text-sm font-medium text-[var(--muted)]">
+          Referral: you have {referralDaysGranted} extra days from sharing.
+        </p>
+      )}
 
       {billingError !== "" && (
         <p className="mb-4 text-sm font-semibold text-[var(--danger)]" role="status">

@@ -16,7 +16,7 @@ export default function TermsPage() {
         Terms of Use
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Operated by {OPERATOR_NAME}. Last updated: August 1, 2026.
+        Operated by {OPERATOR_NAME}. Last updated: August 13, 2026.
       </p>
 
       <div className="mt-8 space-y-6 text-sm leading-relaxed text-[var(--text)]">
@@ -46,7 +46,9 @@ export default function TermsPage() {
             New drivers receive a {TRIAL_DAYS}-day trial. Paid access is{" "}
             {MONTHLY_PRICE_LABEL}, billed through Stripe. After the trial,
             calculator and history access stay locked until you subscribe (or
-            access is arranged).
+            access is arranged). Referral credit is 14 extra days for the
+            referring driver after the referred driver pays, at operator
+            discretion for abuse.
           </p>
         </section>
 

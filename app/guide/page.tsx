@@ -69,6 +69,15 @@ export default function GuidePage() {
             payment method or cancel.
           </p>
         </section>
+
+        <section className="space-y-2">
+          <h2 className="text-base font-bold">7. Share your link</h2>
+          <p className="text-[var(--muted)]">
+            Use Share on the calculator to send your personal signup link.
+            Friends get the normal 7-day trial. You get 14 extra days of access
+            when they subscribe.
+          </p>
+        </section>
       </div>
 
       <p className="mt-10 flex flex-wrap gap-4">
