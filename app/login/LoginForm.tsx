@@ -63,7 +63,9 @@ export default function LoginForm() {
     const next = safePostAuthNext(searchParams.get("next"));
     if (error || accessActive !== true) {
       router.replace(
-        next === "/subscribe" || next === "/feedback" ? next : "/trial-ended",
+        next === "/subscribe" || next === "/feedback" || next === "/refer"
+          ? next
+          : "/trial-ended",
       );
       router.refresh();
       return;

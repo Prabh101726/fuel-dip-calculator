@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SiteFooter from "@/app/components/SiteFooter";
 import { CONTACT_EMAIL, OPERATOR_NAME } from "@/lib/app-copy";
 
 export default function PrivacyPage() {
@@ -75,6 +76,8 @@ export default function PrivacyPage() {
           Back to sign in
         </Link>
       </p>
+
+      <SiteFooter />
     </main>
   );
 }

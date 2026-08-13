@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SiteFooter from "@/app/components/SiteFooter";
 import {
   CONTACT_EMAIL,
   MONTHLY_PRICE_LABEL,
@@ -100,6 +101,8 @@ export default function TermsPage() {
           Back to sign in
         </Link>
       </p>
+
+      <SiteFooter />
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { APP_VERSION_LABEL } from "@/lib/app-version";
 const LINKS = [
   { href: "/about", label: "About" },
   { href: "/guide", label: "User guide" },
+  { href: "/refer", label: "Refer" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
 ] as const;

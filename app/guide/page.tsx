@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SiteFooter from "@/app/components/SiteFooter";
 import { MONTHLY_PRICE_LABEL, SAFETY_REMINDER } from "@/lib/app-copy";
 
 export default function GuidePage() {
@@ -73,9 +74,12 @@ export default function GuidePage() {
         <section className="space-y-2">
           <h2 className="text-base font-bold">7. Share your link</h2>
           <p className="text-[var(--muted)]">
-            Use Share on the calculator to send your personal signup link.
-            Friends get the normal 7-day trial. You get 14 extra days of access
-            when they subscribe.
+            Use Share on the calculator, or open{" "}
+            <Link href="/refer" className="font-bold text-[var(--accent)]">
+              Refer a driver
+            </Link>
+            , to send your personal signup link. Friends get the normal 7-day
+            trial. You get 14 extra days of access when they subscribe.
           </p>
         </section>
       </div>
@@ -88,6 +92,8 @@ export default function GuidePage() {
           About
         </Link>
       </p>
+
+      <SiteFooter />
     </main>
   );
 }

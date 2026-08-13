@@ -30,6 +30,8 @@ save queue, **Stripe Checkout** `$2.99 CAD/month per driver` (early pay via
 webhook **200** proven Aug 11 + `/api/stripe/sync` fallback),
 public `/about` + `/guide` + `/privacy` + `/terms` (shared `SiteFooter`),
 auth-only `/feedback` (calculator header only — not in `SiteFooter`),
+public `/refer` (footer **Refer** next to About / Terms; Share button on the
+page),
 **Share** referral link (`/login?ref=FDXXXX`; 14 extra days for the sharer
 when the friend pays and status is `active`),
 safety reminders, and flat history. Operator: **Detours Fleet Operations**

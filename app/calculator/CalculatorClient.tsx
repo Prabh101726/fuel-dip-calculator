@@ -24,6 +24,7 @@ import {
 } from "@/lib/offline/db";
 import { flushOutbox } from "@/lib/offline/flushOutbox";
 import { tankTabLabel } from "@/lib/product-grades";
+import { referralSignupUrl, shareOrCopyReferralUrl } from "@/lib/referral/share";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -610,17 +611,13 @@ export default function CalculatorClient() {
       setShareFlash("Needs network.");
       return;
     }
-    const url = `${window.location.origin}/login?ref=${code}`;
-    const text =
-      "Fuel Dip Calculator — 7-day trial. If you subscribe, I get 14 extra days.";
+    const url = referralSignupUrl(window.location.origin, code);
     try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ title: "Fuel Dip Calculator", text, url });
-        return;
+      const result = await shareOrCopyReferralUrl(url);
+      if (result === "copied") {
+        setShareFlash("Link copied");
+        window.setTimeout(() => setShareFlash(""), 2500);
       }
-      await navigator.clipboard.writeText(url);
-      setShareFlash("Link copied");
-      window.setTimeout(() => setShareFlash(""), 2500);
     } catch {
       /* user cancelled native share */
     }

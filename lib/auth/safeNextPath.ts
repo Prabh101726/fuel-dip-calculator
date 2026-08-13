@@ -16,12 +16,13 @@ export function safeAuthCallbackNext(
  */
 export function safePostAuthNext(
   next: string | null | undefined,
-): "/calculator" | "/history" | "/subscribe" | "/feedback" {
+): "/calculator" | "/history" | "/subscribe" | "/feedback" | "/refer" {
   if (
     next === "/calculator" ||
     next === "/history" ||
     next === "/subscribe" ||
-    next === "/feedback"
+    next === "/feedback" ||
+    next === "/refer"
   ) {
     return next;
   }
