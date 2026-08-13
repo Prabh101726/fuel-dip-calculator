@@ -25,10 +25,11 @@ describe("safeAuthCallbackNext", () => {
 });
 
 describe("safePostAuthNext", () => {
-  it("allows calculator, history, and subscribe", () => {
+  it("allows calculator, history, subscribe, and feedback", () => {
     expect(safePostAuthNext("/calculator")).toBe("/calculator");
     expect(safePostAuthNext("/history")).toBe("/history");
     expect(safePostAuthNext("/subscribe")).toBe("/subscribe");
+    expect(safePostAuthNext("/feedback")).toBe("/feedback");
   });
 
   it("rejects open redirects", () => {

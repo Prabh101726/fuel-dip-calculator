@@ -62,7 +62,9 @@ export default function LoginForm() {
     const { data: accessActive, error } = await supabase.rpc("my_access_active");
     const next = safePostAuthNext(searchParams.get("next"));
     if (error || accessActive !== true) {
-      router.replace(next === "/subscribe" ? "/subscribe" : "/trial-ended");
+      router.replace(
+        next === "/subscribe" || next === "/feedback" ? next : "/trial-ended",
+      );
       router.refresh();
       return;
     }
