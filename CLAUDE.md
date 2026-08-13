@@ -14,8 +14,9 @@ Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
 **calculator form UX (Jul 28)**, **offline PWA / Project 2 (Jul 29)**,
 **direct-to-driver Stripe billing (Jul 31)**, **soft-launch polish (Aug 1)**,
-**phone OTP login + subscribed UI (Aug 4)**, and **Aug 11 billing unlock +
-phone-only auth** are merged to `main` and **live in production**:
+**phone OTP login + subscribed UI (Aug 4)**, **Aug 11 billing unlock +
+phone-only auth**, and **Aug 13 feedback form + referral share (v0.2.1)**
+are merged to `main` and **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
@@ -43,13 +44,17 @@ safety reminders, and flat history. Operator: **Detours Fleet Operations**
 `docs/superpowers/specs/2026-08-13-feedback-and-referral-design.md`. Original v1
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged** — magic-link → password → phone OTP; phone-only UI live).
-Full audit: `docs/audit-2026-08-11-production-readiness.md`.
+Audits: `docs/audit-2026-08-11-production-readiness.md`,
+`docs/audit-2026-08-12-production-readiness.md`.
 
 **Still open / next priorities:**
 - **Disable Supabase email signup server-side (user ops):** Authentication →
   Providers → Email → turn off **Enable email signup** so the Auth API cannot
   mint new email users. App UI is phone-only; do NOT `supabase config push`.
-  Email-only auth users were **deleted Aug 12** (3 phone users remain).
+  Email-only auth users were **deleted Aug 12** (4 phone drivers remain; all
+  have a `referral_code`).
+- Email notify on each feedback — **deferred**; read table `feedback` in
+  Supabase (not mailed to `contact@detours-app.com`).
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
@@ -307,6 +312,37 @@ Shipped to `main` / production the same day. Audit:
 - CI at ship: **94** unit tests, typecheck, lint green.
 - Auth users snapshot (Aug 11): **3** phone (`14165655673`, `16476209013`, `17808504252` — two subscribed); **5** email-only (UI locked out, rows kept).
 
+## Aug 13 2026 — feedback form + referral share (v0.2.1)
+
+Shipped to `main` / production the same day. Spec:
+`docs/superpowers/specs/2026-08-13-feedback-and-referral-design.md`. Plan
+(corrected): `docs/superpowers/plans/2026-08-13-feedback-and-referral.md`.
+Tag **v0.2.1**. Migration `20260813154202_feedback_and_referral` applied live
+(4/4 drivers backfilled with alphabet-safe `FD….` codes). CI: **112** unit
+tests.
+
+- **Feedback:** auth-only `/feedback` (skip `my_access_active`). Calculator
+  header **Feedback** next to History. **Do not** put Feedback in
+  `SiteFooter` (public pages would bounce logged-out visitors to `/login`).
+  RPC `submit_feedback` 5/hour, max 2000 chars. Not in the dip-calc outbox.
+  `/feedback` is **not** SW-precached (only `/~offline`).
+- **Refer:** public `/refer` (footer **Refer** beside About / Terms / Guide /
+  Privacy). Explains the 14-day credit; Share button + personal link when
+  signed in. Calculator header **Share** still works. Link format
+  `{origin}/login?ref=FDXXXX`.
+- **Credit:** sharer only, **14 days**, only when the referred driver's
+  `subscription_status` is **`active`** (not `trialing` / `past_due`). Friend
+  trial stays **7 days**. Claim-then-apply via `claim_referral_reward`; any
+  apply failure (Stripe, null `trial_ends_at`) calls `unclaim_referral_reward`.
+  Webhook rethrow → 500; `/api/stripe/sync` logs and continues. Null
+  `trial_ends_at` = access-forever — do not write Invalid Date. Extend trial
+  from `max(now, trial_ends_at)`. Crash-window repair:
+  `SELECT unclaim_referral_reward('<referred-uuid>'::uuid);`
+- **`ensure_trial_driver`:** still `now() + interval '7 days'`; insert sets a
+  unique `referral_code` with retry on unique violation. Do not revert trial
+  length when replacing this function.
+- Locked: Feedback stays header-only; referral credit is not emailed.
+
 ## Calculator form UX (Jul 28 2026)
 
 Spec: `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`
@@ -344,8 +380,8 @@ load-bearing:
 - **Never precache auth-gated routes** (`next.config.ts`): a SW installing on
   `/login` before sign-in follows the middleware redirect and stores login
   HTML under the precached key until the next deploy. Only `/~offline` is
-  precached; the calculator shell relies on runtime document caching after the
-  required online sign-in.
+  precached; do **not** add `/feedback` or `/refer`. The calculator shell
+  relies on runtime document caching after the required online sign-in.
 - **Outbox error classification is message/code-based**
   (`lib/offline/flushOutbox.ts`): `PostgrestError` exposes `code`, not an HTTP
   `status` — don't reintroduce status-based branches. `PGRST301`/JWT →
