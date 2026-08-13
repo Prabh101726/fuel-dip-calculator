@@ -33,7 +33,7 @@ auth-only `/feedback` (calculator header only — not in `SiteFooter`),
 **Share** referral link (`/login?ref=FDXXXX`; 14 extra days for the sharer
 when the friend pays and status is `active`),
 safety reminders, and flat history. Operator: **Detours Fleet Operations**
-(`OPERATOR_NAME` in `lib/app-copy.ts`). Soft-launch tag: **v0.2.0**. Specs:
+(`OPERATOR_NAME` in `lib/app-copy.ts`). Current tag: **v0.2.1** (soft-launch was **v0.2.0**). Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
 `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`,
 `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`,

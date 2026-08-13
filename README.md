@@ -14,12 +14,13 @@ Built under **Detours Fleet Operations**, separate from
 
 ## Status
 
-**v0.2.0 — soft launch / pre-production** (Jul 2026). Core driver workflow is live:
+**v0.2.1** (Aug 2026; soft-launch was v0.2.0). Core driver workflow is live:
 
 - Phone OTP sign-in / signup (Canada / US +1)
 - 7-day trial (new drivers); paid plan **$2.99 CAD/month per driver** via Stripe Checkout
 - 4-tab multi-tank calculator
 - **Installable PWA** — used-tank chart cache, draft restore after swipe-up, offline save queue (History still needs network)
+- In-app **Feedback** (calculator header) and **Share** referral link (14 extra days for the sharer when the friend pays)
 - History, Privacy, Terms, safety reminders
 
 **Not yet:** signature capture (image), history filters, Sentry.

@@ -4,6 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
+| [v0.2.1](https://github.com/Prabh101726/fuel-dip-calculator/releases/tag/v0.2.1) | Yes |
 | [v0.2.0](https://github.com/Prabh101726/fuel-dip-calculator/releases/tag/v0.2.0) (soft launch) | Yes |
 | Earlier untagged builds | Best effort only |
 
@@ -23,7 +24,7 @@ Please **do not** open a public GitHub issue for security bugs until we’ve had
 
 We aim to acknowledge reports within a few business days.
 
-## Current security model (v0.2.0)
+## Current security model (v0.2.1)
 
 - **Auth:** Supabase Auth, **phone OTP only** (Canada / US +1). No email signup
   or email/password sign-in in the app.
