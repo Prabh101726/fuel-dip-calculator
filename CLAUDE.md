@@ -414,6 +414,10 @@ load-bearing:
   HTML under the precached key until the next deploy. Only `/~offline` is
   precached; do **not** add `/feedback` or `/refer`. The calculator shell
   relies on runtime document caching after the required online sign-in.
+- **Never 307 `/sw.js`, `/swe-worker-*.js`, `/manifest.webmanifest`, or
+  `/~offline` to `/login`.** Browsers refuse to register a service worker
+  whose script is behind a redirect (Sentry FUEL-DIP-CALCULATOR-5). Keep
+  those paths out of the middleware matcher and in `isPublicPath()`.
 - **Outbox error classification is message/code-based**
   (`lib/offline/flushOutbox.ts`): `PostgrestError` exposes `code`, not an HTTP
   `status` — don't reintroduce status-based branches. `PGRST301`/JWT →

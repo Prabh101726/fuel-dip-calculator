@@ -6,7 +6,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Skip PWA worker + manifest: a 307 to /login makes Chrome refuse SW
+  // registration ("script resource is behind a redirect").
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|swe-worker-[^/]+\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { shouldBypassAccessForCheckoutSuccess } from "@/lib/auth/checkoutSuccessBypass";
+import { isPublicPath } from "@/lib/auth/isPublicPath";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -31,16 +32,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublic =
-    path === "/login" ||
-    path.startsWith("/auth/") ||
-    path === "/trial-ended" ||
-    path === "/privacy" ||
-    path === "/terms" ||
-    path === "/about" ||
-    path === "/guide" ||
-    path === "/refer" ||
-    path === "/api/stripe/webhook";
+  const isPublic = isPublicPath(path);
   // Auth required, but not gated on my_access_active (early subscribe during trial).
   const isAuthOnly = path === "/subscribe" || path === "/feedback";
 
