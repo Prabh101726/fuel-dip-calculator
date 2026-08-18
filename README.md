@@ -14,14 +14,17 @@ Built under **Detours Fleet Operations**, separate from
 
 ## Status
 
-**v0.2.1** (Aug 2026; soft-launch was v0.2.0). Core driver workflow is live:
+**v0.2.2** (Aug 18 2026; v0.2.1 was feedback/referral; soft-launch was v0.2.0).
+Live at [fuel-dip-calculator.app](https://fuel-dip-calculator.app):
 
-- Phone OTP sign-in / signup (Canada / US +1)
+- Phone OTP sign-in / signup (Canada / US +1). Email provider **Disabled** in Supabase.
 - 7-day trial (new drivers); paid plan **$2.99 CAD/month per driver** via Stripe Checkout
 - 4-tab multi-tank calculator
 - **Installable PWA** — used-tank chart cache, draft restore after swipe-up, offline save queue (History still needs network)
-- In-app **Feedback** (calculator header) and **Share** referral link (14 extra days for the sharer when the friend pays)
-- History, Privacy, Terms, safety reminders
+- In-app **Feedback** (calculator header) — saved in Supabase and emailed to [contact@detours-app.com](mailto:contact@detours-app.com)
+- **Share** referral link (14 extra days for the sharer when the friend pays)
+- **Sentry** error monitoring (production)
+- History, Privacy (phone + Stripe Checkout), Terms, safety reminders
 
 **Not yet:** signature capture (image), history filters.
 
@@ -73,7 +76,7 @@ Built under **Detours Fleet Operations**, separate from
 | Doc | What |
 | --- | --- |
 | [`CLAUDE.md`](CLAUDE.md) | Agent/product guide — current live behavior & constraints |
-| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting & soft-launch security posture |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting & security posture |
 | [`docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`](docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md) | Original v1 design (auth has since diverged) |
 | [`docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`](docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md) | Pre-production readiness spec |
 | [`docs/superpowers/plans/2026-07-26-pre-production-readiness.md`](docs/superpowers/plans/2026-07-26-pre-production-readiness.md) | Pre-production implementation plan |

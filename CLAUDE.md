@@ -15,8 +15,10 @@ multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
 **calculator form UX (Jul 28)**, **offline PWA / Project 2 (Jul 29)**,
 **direct-to-driver Stripe billing (Jul 31)**, **soft-launch polish (Aug 1)**,
 **phone OTP login + subscribed UI (Aug 4)**, **Aug 11 billing unlock +
-phone-only auth**, and **Aug 13 feedback form + referral share (v0.2.1)**
-are merged to `main` and **live in production**:
+phone-only auth**, **Aug 13 feedback form + referral share (v0.2.1)**, and
+**Aug 18 public-push ops (v0.2.2)** — Sentry, feedback email to `contact@`,
+Privacy phone + Stripe Checkout, Email provider Disabled — are merged to
+`main` and **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
@@ -36,7 +38,8 @@ page),
 **Share** referral link (`/login?ref=FDXXXX`; 14 extra days for the sharer
 when the friend pays and status is `active`),
 safety reminders, and flat history. Operator: **Detours Fleet Operations**
-(`OPERATOR_NAME` in `lib/app-copy.ts`). Current tag: **v0.2.1** (soft-launch was **v0.2.0**). Specs:
+(`OPERATOR_NAME` in `lib/app-copy.ts`). Current tag: **v0.2.2** (v0.2.1 was
+feedback/referral; soft-launch was **v0.2.0**). Specs:
 `docs/superpowers/specs/2026-07-26-pre-production-readiness-design.md`,
 `docs/superpowers/specs/2026-07-28-calculator-form-ux-design.md`,
 `docs/superpowers/specs/2026-07-29-offline-pwa-design.md`,
@@ -51,15 +54,18 @@ Audits: `docs/audit-2026-08-11-production-readiness.md`,
 **Still open / next priorities:**
 - ~~**Disable Supabase email signup**~~ — **done Aug 18:** Email provider
   **Disabled** (Phone only). Do NOT `supabase config push`.
-- **Feedback email to `contact@`:** `POST /api/feedback` emails via Resend.
-  Set Vercel Production `RESEND_API_KEY` (optional `RESEND_FROM` after
-  verifying `detours-app.com`). Until then, rows still land in table
-  `feedback` and Sentry User Feedback.
-- **Sentry:** project `detours-mobile` / `fuel-dip-calculator` created; SDK
-  uses the public DSN. Ops: Alerts → email `contact@detours-app.com` on new
-  issues; optional `SENTRY_AUTH_TOKEN` on Vercel for source maps.
+- ~~**Feedback email to `contact@`**~~ — **live Aug 18:** `POST /api/feedback`
+  → RPC `submit_feedback` → Resend to `CONTACT_EMAIL`. Vercel
+  `RESEND_API_KEY` + `RESEND_FROM` (`Fuel Dip Calculator <contact@detours-app.com>`).
+  Domain `detours-app.com` **Verified** in Resend. Driver save succeeds even if
+  mail fails. Do not store Resend keys in git.
+- ~~**Sentry**~~ — **live Aug 18:** project `detours-mobile` /
+  `fuel-dip-calculator`; `@sentry/nextjs`; production DSN; `sendDefaultPii: false`;
+  account Issue Alerts **On** (email to Sentry login). Optional:
+  `SENTRY_AUTH_TOKEN` on Vercel for source maps.
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
+- **Twilio spend cap** on the Fuel Dip subaccount — still open before wide ads.
 - ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
   offline works (install / airplane / cached calc / queue / flush path verified
   in the field). Keep load-bearing PWA constraints in the Offline section below.
@@ -347,6 +353,27 @@ tests.
   unique `referral_code` with retry on unique violation. Do not revert trial
   length when replacing this function.
 - Locked: Feedback stays header-only; referral credit is not emailed.
+
+## Aug 18 2026 — public-push ops (v0.2.2)
+
+Shipped to `main` / production the same day. Tag **v0.2.2**. CI: **120** unit
+tests. Audit: `docs/audit-2026-08-18-production-readiness.md`.
+
+- **Email provider Disabled** in Supabase (Phone only). Do not `config push`.
+- **Sentry:** `@sentry/nextjs` (client / server / edge). Project
+  `detours-mobile` / `fuel-dip-calculator`. Production-only init;
+  `sendDefaultPii: false`; error replay masked. SW is NetworkOnly for `/api/`
+  and `sentry.io`. Do not precache `/feedback`.
+- **Feedback mail:** form → `POST /api/feedback` → `submit_feedback` then
+  Resend to `contact@detours-app.com`. From
+  `Fuel Dip Calculator <contact@detours-app.com>` after `detours-app.com`
+  verified. Proven live (row in `feedback` + inbox). Mail failure must not
+  fail the driver's save.
+- **Privacy:** `/privacy` last updated Aug 18 — phone as account identifier;
+  Stripe Checkout collects card + billing email/phone; we store Stripe ids /
+  status only, never PAN/CVC/expiry. Link to Stripe's privacy policy.
+- **Not this tag:** Twilio spend cap (ops before wide ads); Preview env vars;
+  Sentry source-map auth token.
 
 ## Calculator form UX (Jul 28 2026)
 

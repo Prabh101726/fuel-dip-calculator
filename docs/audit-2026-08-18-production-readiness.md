@@ -3,7 +3,7 @@
 **Date:** 2026-08-18  
 **HEAD:** `main` @ `ee3e7e9`  
 **Live:** https://fuel-dip-calculator.app  
-**Tag:** v0.2.1  
+**Tag:** v0.2.2 (audit started at v0.2.1 / `ee3e7e9`; Sentry + Resend + Privacy shipped same day)  
 **Prior:** `docs/audit-2026-08-12-production-readiness.md`
 
 ---
@@ -12,7 +12,7 @@
 
 **Soft-launch GO.** Core product is intact: calc math, phone OTP, billing unlock, PWA constraints, RLS, catalog, feedback, referral. Live traffic is growing (4 → 6 phone drivers since Aug 14).
 
-**Email provider Disabled Aug 18** (Phone only). Sentry project `detours-mobile/fuel-dip-calculator` and feedback email to `contact@` shipped the same day (needs Production deploy + `RESEND_API_KEY`). Twilio spend cap still open before wide ads.
+**Email provider Disabled Aug 18** (Phone only). Sentry + feedback email to `contact@` + Privacy (phone / Stripe Checkout) **live**. Twilio spend cap still open before wide ads.
 
 ---
 
