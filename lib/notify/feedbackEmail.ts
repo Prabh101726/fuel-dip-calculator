@@ -1,5 +1,5 @@
 export const DEFAULT_RESEND_FROM =
-  "Fuel Dip Calculator <beth.t@example.com>";
+  "Fuel Dip Calculator <contact@detours-app.com>";
 
 export type FeedbackNotifyInput = {
   driverId: string;

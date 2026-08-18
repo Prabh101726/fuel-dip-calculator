@@ -26,11 +26,11 @@ export async function notifyOperatorOfFeedback(
   }
 
   const email = await sendOperatorEmail({ subject, text });
-  if (email === "failed") {
+  if (email.status === "failed") {
     try {
       Sentry.captureMessage("feedback operator email failed", {
         level: "warning",
-        extra: { driverId: input.driverId },
+        extra: { driverId: input.driverId, detail: email.detail },
       });
     } catch {
       /* SDK may be disabled */

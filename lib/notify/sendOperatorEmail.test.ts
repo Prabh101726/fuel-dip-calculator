@@ -14,7 +14,7 @@ describe("sendOperatorEmail", () => {
         { subject: "s", text: "t" },
         { env: {}, fetchImpl: fetchImpl as unknown as typeof fetch },
       ),
-    ).resolves.toBe("skipped");
+    ).resolves.toEqual({ status: "skipped" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -28,23 +28,29 @@ describe("sendOperatorEmail", () => {
           fetchImpl: fetchImpl as unknown as typeof fetch,
         },
       ),
-    ).resolves.toBe("sent");
+    ).resolves.toEqual({ status: "sent" });
 
     expect(fetchImpl).toHaveBeenCalledOnce();
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.resend.com/emails");
     const body = JSON.parse(String(init.body)) as {
+      from: string;
       to: string[];
       subject: string;
       text: string;
     };
+    expect(body.from).toContain("contact@detours-app.com");
     expect(body.to).toEqual([CONTACT_EMAIL]);
     expect(body.subject).toBe("Fuel Dip feedback");
     expect(body.text).toBe("hello");
   });
 
   it("returns failed when Resend is not ok", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: false });
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: async () => '{"message":"domain not verified"}',
+    });
     await expect(
       sendOperatorEmail(
         { subject: "s", text: "t" },
@@ -53,6 +59,9 @@ describe("sendOperatorEmail", () => {
           fetchImpl: fetchImpl as unknown as typeof fetch,
         },
       ),
-    ).resolves.toBe("failed");
+    ).resolves.toEqual({
+      status: "failed",
+      detail: '403 {"message":"domain not verified"}',
+    });
   });
 });
