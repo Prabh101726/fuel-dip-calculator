@@ -29,4 +29,10 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/swe-worker-abc/evil.js")).toBe(false);
     expect(isPublicPath("/not-sw.js")).toBe(false);
   });
+
+  it("allows SEO and share-image routes", () => {
+    expect(isPublicPath("/robots.txt")).toBe(true);
+    expect(isPublicPath("/sitemap.xml")).toBe(true);
+    expect(isPublicPath("/opengraph-image")).toBe(true);
+  });
 });

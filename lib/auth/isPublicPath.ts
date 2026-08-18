@@ -16,6 +16,9 @@ export function isPublicPath(path: string): boolean {
     path === "/sw.js" ||
     /^\/swe-worker-[^/]+\.js$/.test(path) ||
     path === "/manifest.webmanifest" ||
-    path === "/~offline"
+    path === "/~offline" ||
+    path === "/robots.txt" ||
+    path === "/sitemap.xml" ||
+    path === "/opengraph-image"
   );
 }
