@@ -21,8 +21,13 @@ Privacy phone + Stripe Checkout, Email provider Disabled — are merged to
 `main` and **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
-**Aug 18 public-surface polish** — OG share image + per-page metadata, baseline
-security headers, robots/sitemap.
+**Aug 18 public-surface polish** — **live:** OG share image + per-page metadata,
+baseline security headers (`lib/security-headers.ts`), `robots.txt` /
+`sitemap.xml`. iMessage unfurl confirmed Aug 18 (image + title + trial/price).
+Share still builds the referral URL from `window.location.origin`, so the card
+footer shows `fuel-dip-calculator.vercel.app` if the driver opened that host;
+canonical origin for metadata/sitemap is `APP_ORIGIN`
+(`https://fuel-dip-calculator.app`).
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
@@ -344,7 +349,10 @@ tests.
 - **Refer:** public `/refer` (footer **Refer** beside About / Terms / Guide /
   Privacy). Explains the 14-day credit; Share button + personal link when
   signed in. Calculator header **Share** still works. Link format
-  `{origin}/login?ref=FDXXXX`.
+  `{origin}/login?ref=FDXXXX`. `referralSignupUrl` currently takes
+  `window.location.origin` (`ReferShare`, calculator Share) — iMessage/WhatsApp
+  then show that host under the OG card. `APP_ORIGIN` in `lib/app-copy.ts` is
+  the custom domain used for `metadataBase` / sitemap, not yet for Share.
 - **Credit:** sharer only, **14 days**, only when the referred driver's
   `subscription_status` is **`active`** (not `trialing` / `past_due`). Friend
   trial stays **7 days**. Claim-then-apply via `claim_referral_reward`; any
@@ -378,6 +386,23 @@ tests. Audit: `docs/audit-2026-08-18-production-readiness.md`.
   status only, never PAN/CVC/expiry. Link to Stripe's privacy policy.
 - **Not this tag:** Twilio spend cap (ops before wide ads); Preview env vars;
   Sentry source-map auth token.
+
+## Aug 18 2026 — public-surface polish
+
+Shipped to `main` / production the same day (after v0.2.2). Plan:
+`docs/superpowers/plans/2026-08-18-public-surface-polish.md`. CI: **131** unit
+tests. Copy constants: `APP_NAME`, `APP_ORIGIN`, `APP_TAGLINE` in
+`lib/app-copy.ts`.
+
+- **OG / titles:** root `metadataBase` + title template; per-page metadata on
+  the six public pages; `app/opengraph-image.tsx` (1200×630). `/login` keeps an
+  absolute title (referral share target). iMessage unfurl confirmed.
+- **Headers:** `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy` via `next.config.ts`. No HSTS (Vercel already sends it).
+  CSP still deferred.
+- **robots / sitemap:** `app/robots.ts` + `app/sitemap.ts`; paths in
+  `isPublicPath()` so they do not 307 to `/login`.
+- **Share URL:** still `window.location.origin` — not switched to `APP_ORIGIN`.
 
 ## Calculator form UX (Jul 28 2026)
 
