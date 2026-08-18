@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { APP_NAME, APP_ORIGIN, APP_TAGLINE } from "@/lib/app-copy";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,10 +14,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fuel Dip Calculator",
-  description:
-    "Safe discharge sheet for fuel delivery — dip chart volumes, ullage, and reconciliation.",
-  applicationName: "Fuel Dip Calculator",
+  metadataBase: new URL(APP_ORIGIN),
+  title: {
+    default: APP_NAME,
+    template: `%s — ${APP_NAME}`,
+  },
+  description: APP_TAGLINE,
+  applicationName: APP_NAME,
+  openGraph: {
+    siteName: APP_NAME,
+    type: "website",
+    title: APP_NAME,
+    description: APP_TAGLINE,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
