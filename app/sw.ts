@@ -23,7 +23,9 @@ const serwist = new Serwist({
     {
       matcher: ({ url }) =>
         url.hostname.includes("supabase.co") ||
+        url.hostname.includes("sentry.io") ||
         url.pathname.startsWith("/auth/") ||
+        url.pathname.startsWith("/api/") ||
         url.pathname.startsWith("/rest/") ||
         url.pathname.startsWith("/functions/"),
       handler: new NetworkOnly(),

@@ -45,23 +45,26 @@ safety reminders, and flat history. Operator: **Detours Fleet Operations**
 design: `docs/superpowers/specs/2026-07-23-fuel-dip-calculator-design.md`
 (**auth diverged** — magic-link → password → phone OTP; phone-only UI live).
 Audits: `docs/audit-2026-08-11-production-readiness.md`,
-`docs/audit-2026-08-12-production-readiness.md`.
+`docs/audit-2026-08-12-production-readiness.md`,
+`docs/audit-2026-08-18-production-readiness.md`.
 
 **Still open / next priorities:**
-- **Disable Supabase email signup server-side (user ops):** Authentication →
-  Providers → Email → turn off **Enable email signup** so the Auth API cannot
-  mint new email users. App UI is phone-only; do NOT `supabase config push`.
-  Email-only auth users were **deleted Aug 12** (4 phone drivers remain; all
-  have a `referral_code`).
-- Email notify on each feedback — **deferred**; read table `feedback` in
-  Supabase (not mailed to `contact@detours-app.com`).
+- ~~**Disable Supabase email signup**~~ — **done Aug 18:** Email provider
+  **Disabled** (Phone only). Do NOT `supabase config push`.
+- **Feedback email to `contact@`:** `POST /api/feedback` emails via Resend.
+  Set Vercel Production `RESEND_API_KEY` (optional `RESEND_FROM` after
+  verifying `detours-app.com`). Until then, rows still land in table
+  `feedback` and Sentry User Feedback.
+- **Sentry:** project `detours-mobile` / `fuel-dip-calculator` created; SDK
+  uses the public DSN. Ops: Alerts → email `contact@detours-app.com` on new
+  issues; optional `SENTRY_AUTH_TOKEN` on Vercel for source maps.
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
   offline works (install / airplane / cached calc / queue / flush path verified
   in the field). Keep load-bearing PWA constraints in the Offline section below.
 - Signature capture (image), history filtering, 12 flagged tanks in
-  `review_needed.json`, Sentry, mismatch-audit UI, security headers — deferred.
+  `review_needed.json`, mismatch-audit UI, security headers — deferred.
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
   (can clobber dashboard Auth URL / SMS settings).
 
@@ -325,7 +328,9 @@ tests.
   header **Feedback** next to History. **Do not** put Feedback in
   `SiteFooter` (public pages would bounce logged-out visitors to `/login`).
   RPC `submit_feedback` 5/hour, max 2000 chars. Not in the dip-calc outbox.
-  `/feedback` is **not** SW-precached (only `/~offline`).
+  `/feedback` is **not** SW-precached (only `/~offline`). Form posts to
+  `POST /api/feedback` (session → RPC → best-effort email to `CONTACT_EMAIL`
+  + Sentry User Feedback). Save still succeeds if `RESEND_API_KEY` is unset.
 - **Refer:** public `/refer` (footer **Refer** beside About / Terms / Guide /
   Privacy). Explains the 14-day credit; Share button + personal link when
   signed in. Calculator header **Share** still works. Link format

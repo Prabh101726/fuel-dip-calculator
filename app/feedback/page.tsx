@@ -3,8 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import SiteFooter from "@/app/components/SiteFooter";
-import { mapFeedbackSubmitError } from "@/lib/feedback/submit";
-import { createClient } from "@/lib/supabase/client";
+import { CONTACT_EMAIL } from "@/lib/app-copy";
 
 export default function FeedbackPage() {
   const [body, setBody] = useState("");
@@ -33,18 +32,21 @@ export default function FeedbackPage() {
     setBusy(true);
     setError("");
     setDone(false);
-    const supabase = createClient();
-    const { error: rpcError } = await supabase.rpc("submit_feedback", {
-      p_body: body,
+    const res = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
     });
     setBusy(false);
-    if (rpcError) {
-      setError(
-        mapFeedbackSubmitError({
-          code: rpcError.code,
-          message: rpcError.message,
-        }),
-      );
+    if (!res.ok) {
+      let message = "Could not send feedback.";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (data.error) message = data.error;
+      } catch {
+        /* keep default */
+      }
+      setError(message);
       return;
     }
     setBody("");
@@ -60,8 +62,8 @@ export default function FeedbackPage() {
         Feedback
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Private message to Detours Fleet Operations. We read these in the
-        dashboard — not a public forum.
+        Private message to Detours Fleet Operations. We get an email at{" "}
+        {CONTACT_EMAIL} and keep a copy in the dashboard — not a public forum.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">

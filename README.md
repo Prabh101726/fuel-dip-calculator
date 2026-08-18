@@ -23,7 +23,7 @@ Built under **Detours Fleet Operations**, separate from
 - In-app **Feedback** (calculator header) and **Share** referral link (14 extra days for the sharer when the friend pays)
 - History, Privacy, Terms, safety reminders
 
-**Not yet:** signature capture (image), history filters, Sentry.
+**Not yet:** signature capture (image), history filters.
 
 ## Stack
 
@@ -31,6 +31,7 @@ Built under **Detours Fleet Operations**, separate from
 - [Supabase](https://supabase.com) (Postgres, Auth, RLS)
 - [Vercel](https://vercel.com)
 - [Serwist](https://serwist.pages.dev) (service worker) + IndexedDB (`idb`)
+- [Sentry](https://sentry.io) (errors; project `detours-mobile` / `fuel-dip-calculator`)
 - GitHub Actions CI (lint, type-check, unit tests, build)
 
 ## Local setup
