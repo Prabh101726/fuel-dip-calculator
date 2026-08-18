@@ -1,5 +1,17 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import LoginForm from "./LoginForm";
+import {
+  APP_NAME,
+  APP_TAGLINE,
+  MONTHLY_PRICE_LABEL,
+  TRIAL_DAYS,
+} from "@/lib/app-copy";
+
+export const metadata: Metadata = {
+  title: { absolute: APP_NAME },
+  description: `${APP_TAGLINE} ${TRIAL_DAYS}-day free trial, then ${MONTHLY_PRICE_LABEL}.`,
+};
 
 export default function LoginPage() {
   return (

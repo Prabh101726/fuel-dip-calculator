@@ -1,6 +1,12 @@
 import Link from "next/link";
 import SiteFooter from "@/app/components/SiteFooter";
 import { CONTACT_EMAIL, OPERATOR_NAME } from "@/lib/app-copy";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const metadata = pageMetadata(
+  "Privacy policy",
+  "What Fuel Dip Calculator collects, stores, and never stores.",
+);
 
 export default function PrivacyPage() {
   return (

@@ -6,6 +6,12 @@ import {
   OPERATOR_NAME,
   TRIAL_DAYS,
 } from "@/lib/app-copy";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const metadata = pageMetadata(
+  "Terms of service",
+  "Terms for using Fuel Dip Calculator, operated by Detours Fleet Operations.",
+);
 
 export default function TermsPage() {
   return (

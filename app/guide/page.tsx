@@ -1,6 +1,12 @@
 import Link from "next/link";
 import SiteFooter from "@/app/components/SiteFooter";
 import { MONTHLY_PRICE_LABEL, SAFETY_REMINDER } from "@/lib/app-copy";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const metadata = pageMetadata(
+  "User guide",
+  "Quick steps for a safe discharge calculation, from sign-in to reconciliation.",
+);
 
 export default function GuidePage() {
   return (

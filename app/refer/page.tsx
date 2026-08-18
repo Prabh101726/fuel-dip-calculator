@@ -1,7 +1,13 @@
 import Link from "next/link";
 import SiteFooter from "@/app/components/SiteFooter";
 import { MONTHLY_PRICE_LABEL, TRIAL_DAYS } from "@/lib/app-copy";
+import { pageMetadata } from "@/lib/page-metadata";
 import ReferShare from "./ReferShare";
+
+export const metadata = pageMetadata(
+  "Refer a driver",
+  "Share your link — you get 14 extra days when a friend subscribes.",
+);
 
 export default function ReferPage() {
   return (

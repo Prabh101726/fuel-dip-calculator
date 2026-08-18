@@ -7,6 +7,12 @@ import {
   SAFETY_REMINDER,
   TRIAL_DAYS,
 } from "@/lib/app-copy";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const metadata = pageMetadata(
+  "About",
+  "What Fuel Dip Calculator is, who operates it, and what it costs.",
+);
 
 export default function AboutPage() {
   return (
