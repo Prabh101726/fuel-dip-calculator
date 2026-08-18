@@ -5,6 +5,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 import { SENTRY_ORG, SENTRY_PROJECT } from "./lib/sentry/dsn";
+import { SECURITY_HEADERS } from "./lib/security-headers";
 
 const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
@@ -31,6 +32,9 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: packageVersion,
+  },
+  async headers() {
+    return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },
 };
 
