@@ -78,7 +78,7 @@ Advisor noise that is **by design**, not regressions:
 
 1. ~~Disable Supabase Email signup~~ **done** (Email provider Disabled)
 2. Twilio spend cap on Fuel Dip subaccount before wide ads
-3. Optional: Vercel Preview env vars, security headers, 12 flagged tanks; SiteSync org still **Free**
+3. Optional: Vercel Preview env vars, 12 flagged tanks; SiteSync org still **Free**
 
 ---
 

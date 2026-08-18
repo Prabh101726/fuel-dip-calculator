@@ -21,6 +21,8 @@ Privacy phone + Stripe Checkout, Email provider Disabled — are merged to
 `main` and **live in production**:
 https://fuel-dip-calculator.app (custom domain) /
 https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calculator`).
+**Aug 18 public-surface polish** — OG share image + per-page metadata, baseline
+security headers, robots/sitemap.
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
@@ -70,7 +72,9 @@ Audits: `docs/audit-2026-08-11-production-readiness.md`,
   offline works (install / airplane / cached calc / queue / flush path verified
   in the field). Keep load-bearing PWA constraints in the Offline section below.
 - Signature capture (image), history filtering, 12 flagged tanks in
-  `review_needed.json`, mismatch-audit UI, security headers — deferred.
+  `review_needed.json`, mismatch-audit UI — deferred.
+- **CSP** — deferred (needs a nonce strategy compatible with Sentry replay; the
+  four baseline headers shipped, see `lib/security-headers.ts`).
 - Do **not** push full local `supabase/config.toml` via `supabase config push`
   (can clobber dashboard Auth URL / SMS settings).
 
@@ -418,6 +422,9 @@ load-bearing:
   `/~offline` to `/login`.** Browsers refuse to register a service worker
   whose script is behind a redirect (Sentry FUEL-DIP-CALCULATOR-5). Keep
   those paths out of the middleware matcher and in `isPublicPath()`.
+- **Public-URL rule:** any new publicly fetchable route (metadata files, share
+  images) must be added to `isPublicPath()` — middleware 307s break crawlers,
+  unfurl bots, and SW registration alike.
 - **Outbox error classification is message/code-based**
   (`lib/offline/flushOutbox.ts`): `PostgrestError` exposes `code`, not an HTTP
   `status` — don't reintroduce status-based branches. `PGRST301`/JWT →
