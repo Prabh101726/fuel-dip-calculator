@@ -24,10 +24,8 @@ https://fuel-dip-calculator.vercel.app (Vercel project `detours/fuel-dip-calcula
 **Aug 18 public-surface polish** — **live:** OG share image + per-page metadata,
 baseline security headers (`lib/security-headers.ts`), `robots.txt` /
 `sitemap.xml`. iMessage unfurl confirmed Aug 18 (image + title + trial/price).
-Share still builds the referral URL from `window.location.origin`, so the card
-footer shows `fuel-dip-calculator.vercel.app` if the driver opened that host;
-canonical origin for metadata/sitemap is `APP_ORIGIN`
-(`https://fuel-dip-calculator.app`).
+Share and Refer always use `APP_ORIGIN` (`https://fuel-dip-calculator.app`),
+not `window.location.origin`, so the card footer never shows `vercel.app`.
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
@@ -349,10 +347,9 @@ tests.
 - **Refer:** public `/refer` (footer **Refer** beside About / Terms / Guide /
   Privacy). Explains the 14-day credit; Share button + personal link when
   signed in. Calculator header **Share** still works. Link format
-  `{origin}/login?ref=FDXXXX`. `referralSignupUrl` currently takes
-  `window.location.origin` (`ReferShare`, calculator Share) — iMessage/WhatsApp
-  then show that host under the OG card. `APP_ORIGIN` in `lib/app-copy.ts` is
-  the custom domain used for `metadataBase` / sitemap, not yet for Share.
+  `{APP_ORIGIN}/login?ref=FDXXXX`. `referralSignupUrl(code)` always uses
+  `APP_ORIGIN` (`ReferShare`, calculator Share) so iMessage/WhatsApp show
+  `fuel-dip-calculator.app` even if the driver opened the Vercel host.
 - **Credit:** sharer only, **14 days**, only when the referred driver's
   `subscription_status` is **`active`** (not `trialing` / `past_due`). Friend
   trial stays **7 days**. Claim-then-apply via `claim_referral_reward`; any
@@ -402,7 +399,7 @@ tests. Copy constants: `APP_NAME`, `APP_ORIGIN`, `APP_TAGLINE` in
   CSP still deferred.
 - **robots / sitemap:** `app/robots.ts` + `app/sitemap.ts`; paths in
   `isPublicPath()` so they do not 307 to `/login`.
-- **Share URL:** still `window.location.origin` — not switched to `APP_ORIGIN`.
+- **Share URL:** `referralSignupUrl(code)` always uses `APP_ORIGIN`.
 
 ## Calculator form UX (Jul 28 2026)
 

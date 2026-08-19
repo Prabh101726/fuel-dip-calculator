@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { APP_ORIGIN } from "@/lib/app-copy";
 import { referralSignupUrl } from "./share";
 
 describe("referralSignupUrl", () => {
-  it("builds a login ref link", () => {
-    expect(referralSignupUrl("https://fuel-dip-calculator.app", "FD7K2P")).toBe(
-      "https://fuel-dip-calculator.app/login?ref=FD7K2P",
+  it("always uses the canonical app origin, not the current host", () => {
+    expect(referralSignupUrl("FD7K2P")).toBe(
+      `${APP_ORIGIN}/login?ref=FD7K2P`,
     );
+    expect(referralSignupUrl("FD7K2P")).not.toContain("vercel.app");
   });
 
-  it("strips a trailing slash on origin", () => {
-    expect(referralSignupUrl("https://fuel-dip-calculator.app/", "FD7K2P")).toBe(
-      "https://fuel-dip-calculator.app/login?ref=FD7K2P",
+  it("encodes the referral code", () => {
+    expect(referralSignupUrl("FD 7K")).toBe(
+      `${APP_ORIGIN}/login?ref=FD%207K`,
     );
   });
 });

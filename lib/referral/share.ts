@@ -1,9 +1,11 @@
+import { APP_ORIGIN } from "@/lib/app-copy";
+
 export const REFERRAL_SHARE_TITLE = "Fuel Dip Calculator";
 export const REFERRAL_SHARE_TEXT =
   "Fuel Dip Calculator — 7-day trial. If you subscribe, I get 14 extra days.";
 
-export function referralSignupUrl(origin: string, code: string): string {
-  return `${origin.replace(/\/$/, "")}/login?ref=${encodeURIComponent(code)}`;
+export function referralSignupUrl(code: string): string {
+  return `${APP_ORIGIN}/login?ref=${encodeURIComponent(code)}`;
 }
 
 export async function shareOrCopyReferralUrl(

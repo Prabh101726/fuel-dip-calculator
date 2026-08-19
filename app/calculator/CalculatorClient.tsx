@@ -611,7 +611,7 @@ export default function CalculatorClient() {
       setShareFlash("Needs network.");
       return;
     }
-    const url = referralSignupUrl(window.location.origin, code);
+    const url = referralSignupUrl(code);
     try {
       const result = await shareOrCopyReferralUrl(url);
       if (result === "copied") {

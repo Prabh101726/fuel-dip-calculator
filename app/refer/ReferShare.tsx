@@ -36,7 +36,7 @@ export default function ReferShare() {
         setStatus("error");
         return;
       }
-      setUrl(referralSignupUrl(window.location.origin, code));
+      setUrl(referralSignupUrl(code));
       setStatus("ready");
     })();
     return () => {
