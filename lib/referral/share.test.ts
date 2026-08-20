@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { APP_ORIGIN } from "@/lib/app-copy";
-import { referralSignupUrl } from "./share";
+import { referralSharePayload, referralSignupUrl } from "./share";
 
 describe("referralSignupUrl", () => {
   it("always uses the canonical app origin, not the current host", () => {
@@ -14,5 +14,15 @@ describe("referralSignupUrl", () => {
     expect(referralSignupUrl("FD 7K")).toBe(
       `${APP_ORIGIN}/login?ref=FD%207K`,
     );
+  });
+});
+
+describe("referralSharePayload", () => {
+  it("sends only title and url so Messages does not append the trial sentence", () => {
+    const url = `${APP_ORIGIN}/login?ref=FDD2A4`;
+    expect(referralSharePayload(url)).toEqual({
+      title: "Fuel Dip Calculator",
+      url,
+    });
   });
 });
