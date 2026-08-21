@@ -31,11 +31,11 @@ export default function AboutPage() {
         <section className="space-y-2">
           <h2 className="text-base font-bold">What this is</h2>
           <p className="text-[var(--muted)]">
-            Fuel Dip Calculator replaces the paper Safe Discharge Sheet and a
-            large dip-chart PDF. Drivers pick a tank chart and safe-fill %,
-            enter a dip reading, and get volume and safe headroom instantly.
-            After delivery, enter the closing dip for delivered volume and
-            reconciliation.
+            Fuel Dip Calculator is an online dip calculator with the full fuel
+            dip-chart catalog built in. Drivers pick a tank chart and
+            safe-fill %, enter a dip reading, and get volume and safe headroom
+            instantly. After delivery, enter the closing dip for delivered
+            volume and reconciliation.
           </p>
         </section>
 
