@@ -29,3 +29,9 @@ body {
   color: var(--text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* Avoid Safari/PWA white flash before body paints. */
+html {
+  background: var(--background);
+  color-scheme: dark;
+}

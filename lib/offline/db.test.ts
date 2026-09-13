@@ -4,6 +4,7 @@ import {
   blankSlotDraft,
   isAuthErrorStatus,
   isClientRejectStatus,
+  isIdbConnectionError,
   isNetworkLikeError,
   isTrialExpired,
 } from "./db";
@@ -31,5 +32,25 @@ describe("offline helpers", () => {
 
   it("treats TypeError as network-like", () => {
     expect(isNetworkLikeError(new TypeError("Failed to fetch"))).toBe(true);
+  });
+
+  it("detects Safari IDB connection-closing and UnknownError cases", () => {
+    expect(
+      isIdbConnectionError(
+        new DOMException(
+          "Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+          "InvalidStateError",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      isIdbConnectionError(
+        new DOMException(
+          "An internal error was encountered in the Indexed Database server",
+          "UnknownError",
+        ),
+      ),
+    ).toBe(true);
+    expect(isIdbConnectionError(new Error("Failed to fetch"))).toBe(false);
   });
 });

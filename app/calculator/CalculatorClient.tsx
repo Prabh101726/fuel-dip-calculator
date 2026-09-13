@@ -142,6 +142,8 @@ export default function CalculatorClient() {
         activeTab: activeTabRef.current,
         slots: slotDraftsRef.current,
         updatedAt: new Date().toISOString(),
+      }).catch(() => {
+        // Safari may close IDB while backgrounded; withOfflineDb retries once.
       });
     }, DRAFT_DEBOUNCE_MS);
   }, []);

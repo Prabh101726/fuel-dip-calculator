@@ -97,6 +97,43 @@ interface FuelDipOfflineDb extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<FuelDipOfflineDb>> | null = null;
 
+function dropOfflineDbHandle() {
+  dbPromise = null;
+}
+
+/** Safari closes IDB under memory pressure / PWA suspend; reopen once. */
+export function isIdbConnectionError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/database connection is closing/i.test(msg)) return true;
+  if (/Indexed Database server/i.test(msg)) return true;
+  if (/not allowed or at a time when it is not allowed/i.test(msg)) return true;
+  // Safari + fake-indexeddb both surface closed handles as InvalidStateError /
+  // UnknownError DOMExceptions without a stable message across engines.
+  if (
+    typeof DOMException !== "undefined" &&
+    err instanceof DOMException &&
+    (err.name === "InvalidStateError" || err.name === "UnknownError")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function attachDbLifecycle(db: IDBPDatabase<FuelDipOfflineDb>) {
+  const raw = db as unknown as IDBDatabase;
+  raw.onclose = () => {
+    dropOfflineDbHandle();
+  };
+  raw.onversionchange = () => {
+    dropOfflineDbHandle();
+    try {
+      db.close();
+    } catch {
+      // already closing
+    }
+  };
+}
+
 export function getOfflineDb() {
   if (!dbPromise) {
     dbPromise = openDB<FuelDipOfflineDb>(DB_NAME, DB_VERSION, {
@@ -112,9 +149,27 @@ export function getOfflineDb() {
           db.createObjectStore("catalog", { keyPath: "id" });
         }
       },
+    }).then((db) => {
+      attachDbLifecycle(db);
+      return db;
     });
   }
   return dbPromise;
+}
+
+/** Run an IDB op; if Safari closed the connection, reopen and retry once. */
+export async function withOfflineDb<T>(
+  op: (db: IDBPDatabase<FuelDipOfflineDb>) => Promise<T>,
+): Promise<T> {
+  try {
+    const db = await getOfflineDb();
+    return await op(db);
+  } catch (err) {
+    if (!isIdbConnectionError(err)) throw err;
+    dropOfflineDbHandle();
+    const db = await getOfflineDb();
+    return await op(db);
+  }
 }
 
 /** Test helper — reset module DB handle between tests. */
@@ -128,89 +183,86 @@ export function isBrowserOnline(): boolean {
 }
 
 export async function putCachedTank(chart: CachedTankChart): Promise<void> {
-  const db = await getOfflineDb();
-  await db.put("charts", chart);
+  await withOfflineDb((db) => db.put("charts", chart));
 }
 
 export async function getCachedTank(
   tankTypeId: string,
 ): Promise<CachedTankChart | undefined> {
-  const db = await getOfflineDb();
-  return db.get("charts", tankTypeId);
+  return withOfflineDb((db) => db.get("charts", tankTypeId));
 }
 
 export async function listCachedTanks(): Promise<CachedTankChart[]> {
-  const db = await getOfflineDb();
-  return db.getAll("charts");
+  return withOfflineDb((db) => db.getAll("charts"));
 }
 
 export async function putTankCatalog(tanks: TankCatalogEntry[]): Promise<void> {
-  const db = await getOfflineDb();
-  await db.put("catalog", {
-    id: "current",
-    tanks,
-    updatedAt: new Date().toISOString(),
-  });
+  await withOfflineDb((db) =>
+    db.put("catalog", {
+      id: "current",
+      tanks,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
 }
 
 export async function getTankCatalog(): Promise<TankCatalog | undefined> {
-  const db = await getOfflineDb();
-  return db.get("catalog", "current");
+  return withOfflineDb((db) => db.get("catalog", "current"));
 }
 
 export async function putSessionMeta(
   meta: Omit<OfflineSessionMeta, "id">,
 ): Promise<void> {
-  const db = await getOfflineDb();
-  await db.put("session", { ...meta, id: "current" });
+  await withOfflineDb((db) =>
+    db.put("session", { ...meta, id: "current" }),
+  );
 }
 
 export async function getSessionMeta(): Promise<OfflineSessionMeta | undefined> {
-  const db = await getOfflineDb();
-  return db.get("session", "current");
+  return withOfflineDb((db) => db.get("session", "current"));
 }
 
 export async function putDraft(draft: Omit<CalculatorDraft, "id">): Promise<void> {
-  const db = await getOfflineDb();
-  await db.put("drafts", { ...draft, id: "current" });
+  await withOfflineDb((db) =>
+    db.put("drafts", { ...draft, id: "current" }),
+  );
 }
 
 export async function getDraft(): Promise<CalculatorDraft | undefined> {
-  const db = await getOfflineDb();
-  return db.get("drafts", "current");
+  return withOfflineDb((db) => db.get("drafts", "current"));
 }
 
 export async function clearDraft(): Promise<void> {
-  const db = await getOfflineDb();
-  await db.delete("drafts", "current");
+  await withOfflineDb((db) => db.delete("drafts", "current"));
 }
 
 /** Clears per-driver offline state on logout (keeps shared tank chart cache). */
 export async function clearOfflineUserData(): Promise<void> {
-  const db = await getOfflineDb();
-  await db.delete("session", "current");
-  await db.delete("drafts", "current");
-  await db.clear("outbox");
+  await withOfflineDb(async (db) => {
+    await db.delete("session", "current");
+    await db.delete("drafts", "current");
+    await db.clear("outbox");
+  });
 }
 
 export async function enqueueOutbox(
   payload: Record<string, unknown>,
 ): Promise<OutboxItem> {
-  const db = await getOfflineDb();
-  const item: OutboxItem = {
-    id: crypto.randomUUID(),
-    payload,
-    createdAt: new Date().toISOString(),
-    status: "pending",
-    lastError: null,
-  };
-  await db.put("outbox", item);
-  return item;
+  return withOfflineDb(async (db) => {
+    const item: OutboxItem = {
+      id: crypto.randomUUID(),
+      payload,
+      createdAt: new Date().toISOString(),
+      status: "pending",
+      lastError: null,
+    };
+    await db.put("outbox", item);
+    return item;
+  });
 }
 
 export async function listOutbox(): Promise<OutboxItem[]> {
-  const db = await getOfflineDb();
-  return db.getAllFromIndex("outbox", "by-created");
+  return withOfflineDb((db) => db.getAllFromIndex("outbox", "by-created"));
 }
 
 export async function countPendingOutbox(): Promise<number> {
@@ -219,21 +271,21 @@ export async function countPendingOutbox(): Promise<number> {
 }
 
 export async function deleteOutboxItem(id: string): Promise<void> {
-  const db = await getOfflineDb();
-  await db.delete("outbox", id);
+  await withOfflineDb((db) => db.delete("outbox", id));
 }
 
 export async function markOutboxFailed(
   id: string,
   lastError: string,
 ): Promise<void> {
-  const db = await getOfflineDb();
-  const item = await db.get("outbox", id);
-  if (!item) return;
-  await db.put("outbox", {
-    ...item,
-    status: "failed",
-    lastError,
+  await withOfflineDb(async (db) => {
+    const item = await db.get("outbox", id);
+    if (!item) return;
+    await db.put("outbox", {
+      ...item,
+      status: "failed",
+      lastError,
+    });
   });
 }
 

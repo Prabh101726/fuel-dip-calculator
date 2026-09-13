@@ -17,7 +17,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-4 py-12 text-sm text-[var(--muted)]">
+        <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center bg-[var(--background)] px-4 py-12 text-sm text-[var(--muted)]">
           Loading…
         </main>
       }

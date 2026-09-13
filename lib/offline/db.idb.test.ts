@@ -107,4 +107,19 @@ describe("offline IDB helpers", () => {
     expect(await db.getAll("outbox")).toHaveLength(0);
     expect(await getCachedTank("t1")).toBeTruthy();
   });
+
+  it("reopens IDB after Safari closes the connection mid-session", async () => {
+    await putSessionMeta({
+      driverId: "d1",
+      companyId: "c1",
+      trialEndsAt: "2099-01-01T00:00:00.000Z",
+      subscriptionStatus: null,
+      updatedAt: "2026-07-29T00:00:00.000Z",
+    });
+    const db = await getOfflineDb();
+    db.close();
+
+    const meta = await getSessionMeta();
+    expect(meta?.driverId).toBe("d1");
+  });
 });
