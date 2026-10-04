@@ -26,6 +26,8 @@ baseline security headers (`lib/security-headers.ts`), `robots.txt` /
 `sitemap.xml`. iMessage unfurl confirmed Aug 18 (image + title + trial/price).
 Share and Refer always use `APP_ORIGIN` (`https://fuel-dip-calculator.app`),
 not `window.location.origin`, so the card footer never shows `vercel.app`.
+**Oct 4:** `companies.trial_ends_at` nullable live (null = forever access);
+operator `14165655673` open-access granted.
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
@@ -88,7 +90,13 @@ passed Jul 29 — SQL interpolation verified against regression tanks
 #014/#015/#526):
 - **H1:** `my_trial_active()` + insert/update RLS on `dip_calculations` (SELECT
   ungated — expired trials keep read access; middleware still gates the UI).
-  Null `trial_ends_at` = active, matching middleware. **Stripe (shipped):**
+  Null `trial_ends_at` = active, matching middleware. **Oct 4 2026:**
+  migration `20261004160000_allow_null_trial_ends_at` applied live —
+  dropped `NOT NULL` on `companies.trial_ends_at` so forever-access
+  (null) actually works (column stayed NOT NULL since the Jul 23 trial
+  migration). New companies still default to `now() + 7 days`. Operator
+  account `14165655673` granted `trial_ends_at = null` (open access;
+  Stripe may remain `canceled`). **Stripe (shipped):**
   `my_trial_active()` aliases / uses `my_access_active()` — trial open **or**
   this driver's `subscription_status` in `active`/`trialing`/`past_due`.
   Do not add a second policy check; keep one access definition.
