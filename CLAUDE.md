@@ -72,7 +72,9 @@ Audits: `docs/audit-2026-08-11-production-readiness.md`,
   `SENTRY_AUTH_TOKEN` on Vercel for source maps.
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
-- **Twilio spend cap** on the Fuel Dip subaccount — still open before wide ads.
+- **Twilio Geo + spend alerts** on the Fuel Dip subaccount — still open before
+  wide ads (see Auth section Oct 4 notes). Edge allowlist function is deployed;
+  enable the Before User Created hook in the dashboard.
 - ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
   offline works (install / airplane / cached calc / queue / flush path verified
   in the field). Keep load-bearing PWA constraints in the Offline section below.
@@ -215,6 +217,21 @@ Phone OTP is the **only** sign-in / signup path in the app.
 - Aug 11: email/password UI, forgot-password flow, and reset-password form
   removed. `/auth/reset-password` now points users to phone sign-in. Ops:
   disable **Enable email signup** in the Email provider (do not config push).
+- **Oct 4 OTP abuse lesson:** UI + `request_otp_throttle` are +1-only, but the
+  public anon key can call `supabase.auth.signInWithOtp` directly and skip the
+  throttle. Sep 2026 saw 5 non-NANP + 1 incomplete +1 auth rows (no `drivers`).
+  **Cleaned Oct 4** (deleted those 6 incomplete `auth.users`). Defense in depth:
+  1. Edge Function `otp-phone-allowlist` **deployed** (Before User Created hook
+     — rejects non-+1 NANP). **Ops:** Dashboard → Authentication → Hooks →
+     enable **Before User Created** → HTTPS → this function URL. Do not
+     `config push`.
+  2. **Twilio Geo Permissions** on the Fuel Dip subaccount: disable inheritance
+     from parent if needed, enable **Canada + United States only**
+     ([SMS Geo Permissions](https://www.twilio.com/docs/messaging/guides/sms-geo-permissions)).
+     This is the real SMS cost backstop.
+  3. **Spend alerts:** Twilio has no hard per-subaccount spend cap; set Usage
+     Triggers / billing alerts on the parent for the Fuel Dip subaccount before
+     wide ads.
 
 ## Pre-production readiness (Jul 26 2026)
 
