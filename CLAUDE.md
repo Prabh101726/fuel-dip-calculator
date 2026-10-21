@@ -113,6 +113,10 @@ passed Jul 29 — SQL interpolation verified against regression tanks
   null `after_dip_cm` must never flag a mismatch (after-side checks are gated
   on its presence). Mismatch rows are audit-only; no UI on purpose. Spec:
   `docs/superpowers/specs/2026-07-29-security-hardenings-design.md`.
+  **Oct 21:** migration `20261021180000_revoke_interpolate_dip_volume_execute`
+  applied live — revoked `authenticated` EXECUTE on `interpolate_dip_volume`
+  (Jul 29 already revoked PUBLIC/anon; left authenticated by accident).
+  Trigger-only, same as `recompute_dip_volumes`.
 - **H4:** `/auth/callback` `next` allowlisted to `/calculator` | `/history`
   via `lib/auth/safeNextPath.ts` (fixed a real open redirect —
   `next=@evil.com` produced a userinfo-host URL).
