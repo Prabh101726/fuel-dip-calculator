@@ -27,7 +27,9 @@ baseline security headers (`lib/security-headers.ts`), `robots.txt` /
 Share and Refer always use `APP_ORIGIN` (`https://fuel-dip-calculator.app`),
 not `window.location.origin`, so the card footer never shows `vercel.app`.
 **Oct 4:** `companies.trial_ends_at` nullable live (null = forever access);
-operator `14165655673` open-access granted.
+operator `14165655673` open-access granted. **Oct 21:** DB trigger
+`enforce_auth_users_nanp_otp_trg` live on `auth.users` (blocks non-NANP and
+direct unthrottled `/auth/v1/otp` calls in Postgres before Twilio).
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
@@ -73,8 +75,9 @@ Audits: `docs/audit-2026-08-11-production-readiness.md`,
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
 - **Twilio Geo + spend alerts** on the Fuel Dip subaccount — still open before
-  wide ads (see Auth section Oct 4 notes). Edge allowlist function is deployed;
-  enable the Before User Created hook in the dashboard.
+  wide ads (see Auth section Oct 4 / Oct 21 notes). DB trigger on `auth.users`
+  is live; Edge allowlist function is also deployed if you want the Before User
+  Created hook enabled in the dashboard.
 - ~~**Project 2 on-device manual checklist**~~ — **confirmed Aug 11 (user):**
   offline works (install / airplane / cached calc / queue / flush path verified
   in the field). Keep load-bearing PWA constraints in the Offline section below.
@@ -217,19 +220,29 @@ Phone OTP is the **only** sign-in / signup path in the app.
 - Aug 11: email/password UI, forgot-password flow, and reset-password form
   removed. `/auth/reset-password` now points users to phone sign-in. Ops:
   disable **Enable email signup** in the Email provider (do not config push).
-- **Oct 4 OTP abuse lesson:** UI + `request_otp_throttle` are +1-only, but the
-  public anon key can call `supabase.auth.signInWithOtp` directly and skip the
-  throttle. Sep 2026 saw 5 non-NANP + 1 incomplete +1 auth rows (no `drivers`).
-  **Cleaned Oct 4** (deleted those 6 incomplete `auth.users`). Defense in depth:
-  1. Edge Function `otp-phone-allowlist` **deployed** (Before User Created hook
+- **Oct 4 & Oct 21 OTP abuse lesson:** UI + `request_otp_throttle` are +1-only,
+  but the public anon key can call `supabase.auth.signInWithOtp` directly and
+  skip the throttle. Sep 2026 saw 6 orphan auth rows (cleaned Oct 4); Oct 17 saw
+  a 22-second bot burst create 27 orphan `auth.users` rows (26 international
+  non-NANP + 1 unverified US number — **cleaned Oct 21**). Defense in depth:
+  1. **DB trigger `enforce_auth_users_nanp_otp_trg` on `auth.users` (live Oct 21,
+     migration `20261021160000_enforce_nanp_and_otp_throttle_on_auth_users`):**
+     `BEFORE INSERT OR UPDATE OF phone, confirmation_sent_at` rejects any
+     non-NANP phone (`!~ '^1[2-9][0-9]{2}[2-9][0-9]{6}$'`) AND requires a fresh
+     (`<30s`) `public.otp_throttle` row on `INSERT` / `confirmation_sent_at`
+     update (plus a 55s cooldown gap). Because GoTrue runs `INSERT INTO
+     auth.users` in `SignupNewUser` **before** `sendPhoneConfirmation`, both
+     non-NANP numbers and direct `/auth/v1/otp` calls that skip
+     `request_otp_throttle` abort in Postgres before Twilio is ever called.
+  2. Edge Function `otp-phone-allowlist` **deployed** (Before User Created hook
      — rejects non-+1 NANP). **Ops:** Dashboard → Authentication → Hooks →
      enable **Before User Created** → HTTPS → this function URL. Do not
      `config push`.
-  2. **Twilio Geo Permissions** on the Fuel Dip subaccount: disable inheritance
+  3. **Twilio Geo Permissions** on the Fuel Dip subaccount: disable inheritance
      from parent if needed, enable **Canada + United States only**
      ([SMS Geo Permissions](https://www.twilio.com/docs/messaging/guides/sms-geo-permissions)).
      This is the real SMS cost backstop.
-  3. **Spend alerts:** Twilio has no hard per-subaccount spend cap; set Usage
+  4. **Spend alerts:** Twilio has no hard per-subaccount spend cap; set Usage
      Triggers / billing alerts on the parent for the Fuel Dip subaccount before
      wide ads.
 
