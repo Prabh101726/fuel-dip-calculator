@@ -8,7 +8,12 @@ reading, get volume + safe headroom instantly; after delivery, enter the closing
 dip and get delivered volume + reconciliation.
 
 **Stack:** Next.js (TypeScript, App Router) · Supabase (Postgres, Auth, RLS) ·
-Vercel · GitHub Actions CI (lint, type-check, unit tests on every push).
+Vercel (Node **24.x**, managed patches) · GitHub Actions CI (Node **24.22.1**,
+lint, type-check, unit tests on every push). **Oct 25:** pin CI + `engines.node`
+`24.x` / `.nvmrc` `24.22.1` for Node2Shell CVE-2026-111497 (Brotli RCE). Vercel
+WAF covers inbound; local Hermes Node **26.9.0** is still unpatched — upgrade
+that install to **26.12.1** separately (do not replace `~/.hermes/node` from
+this repo).
 
 **Status:** Foundation (Jul 23), driver-facing + password auth (Jul 23),
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
@@ -30,6 +35,11 @@ not `window.location.origin`, so the card footer never shows `vercel.app`.
 operator `14165655673` open-access granted. **Oct 21:** DB trigger
 `enforce_auth_users_nanp_otp_trg` live on `auth.users` (blocks non-NANP and
 direct unthrottled `/auth/v1/otp` calls in Postgres before Twilio).
+**Oct 25:** Node2Shell CVE-2026-111497 — CI pinned to **24.22.1**,
+`engines.node` **24.x**, `.nvmrc` **24.22.1**. Vercel project
+`detours/fuel-dip-calculator` already on managed **24.x** (WAF covers inbound;
+Vercel rolls the patch). Still **6** real drivers (no new signups; Oct 17
+orphans stayed gone). Local Hermes Node **26.9.0** is still unpatched.
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
@@ -74,6 +84,8 @@ Audits: `docs/audit-2026-08-11-production-readiness.md`,
   `SENTRY_AUTH_TOKEN` on Vercel for source maps.
 - Vercel **Preview** env vars (`NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) still unset — Production only.
+  Optional: set Production `NEXT_PUBLIC_SITE_URL=https://fuel-dip-calculator.app`
+  so Stripe Checkout success/cancel URLs do not fall back to `x-forwarded-host`.
 - **Twilio Geo + spend alerts** on the Fuel Dip subaccount — still open before
   wide ads (see Auth section Oct 4 / Oct 21 notes). DB trigger on `auth.users`
   is live; Edge allowlist function is also deployed if you want the Before User
