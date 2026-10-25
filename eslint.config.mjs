@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "public/sw.js",
     "public/sw.js.map",
     "public/swe-worker-*.js",
+    // ECC Cursor adapter (hooks/scripts/skills) — not the Next.js app.
+    ".cursor/**",
   ]),
 ]);
 
