@@ -11,9 +11,8 @@ dip and get delivered volume + reconciliation.
 Vercel (Node **24.x**, managed patches) · GitHub Actions CI (Node **24.22.1**,
 lint, type-check, unit tests on every push). **Oct 25:** pin CI + `engines.node`
 `24.x` / `.nvmrc` `24.22.1` for Node2Shell CVE-2026-111497 (Brotli RCE). Vercel
-WAF covers inbound; local Hermes Node **26.9.0** is still unpatched — upgrade
-that install to **26.12.1** separately (do not replace `~/.hermes/node` from
-this repo).
+WAF covers inbound. Local Hermes Node confirmed **26.12.1** (Oct 25, patched
+for Node2Shell).
 
 **Status:** Foundation (Jul 23), driver-facing + password auth (Jul 23),
 multi-tank calculator (Jul 24), **pre-production readiness (Jul 26)**,
@@ -39,7 +38,7 @@ direct unthrottled `/auth/v1/otp` calls in Postgres before Twilio).
 `engines.node` **24.x**, `.nvmrc` **24.22.1**. Vercel project
 `detours/fuel-dip-calculator` already on managed **24.x** (WAF covers inbound;
 Vercel rolls the patch). Still **6** real drivers (no new signups; Oct 17
-orphans stayed gone). Local Hermes Node **26.9.0** is still unpatched.
+orphans stayed gone). Local Hermes Node confirmed **26.12.1** (patched).
 Live now: **phone OTP only** (+1 NANP, server-side throttle; email/password
 UI removed Aug 11), **7-day trial** for new companies (was 14-day at
 launch — existing `trial_ends_at` not backfilled), auto-provisioned
